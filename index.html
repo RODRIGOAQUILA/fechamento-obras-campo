@@ -160,7 +160,10 @@
       body{background:#fff}
       main{max-width:none;margin:0;padding:0}
       .panel{display:block!important}
-      #formPanel,#segmentPanel{display:none!important}
+      #headerPanel,#formPanel,#segmentPanel{display:none!important}
+      #summaryPanel{display:block!important}
+      #summaryPanel .summary-logo-top{display:flex!important;margin-top:0!important;padding-top:0!important}
+      #summaryPanel .summary-point-title{background:#2563eb!important;color:#fff!important;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
       .card{box-shadow:none;break-inside:avoid}
     }
   </style>
@@ -1284,7 +1287,7 @@ function renderSummaryPoints(){
       div.innerHTML=`
         <div class="row" style="justify-content:space-between;align-items:flex-start">
           <div>
-            <div class="title">${p.code}</div>
+            <div class="summary-point-title">${escapeHtml(p.code)}</div>
             <div class="meta">${localDateTime(p.createdAt)} · ${p.lat?.toFixed?.(6)??p.lat}, ${p.lng?.toFixed?.(6)??p.lng}</div>
           </div>
         </div>
