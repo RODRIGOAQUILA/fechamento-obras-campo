@@ -861,15 +861,18 @@ function structureOptions(selected=""){
 function addSubpoint(data={}){
   try{
     if(!Array.isArray(currentSubpoints)) currentSubpoints=[];
-    currentSubpoints.push(ensureSubpoint(data));
+    const novo=ensureSubpoint(data);
+    currentSubpoints.push(novo);
     renderSubpoints();
-    const cards=document.querySelectorAll("#subpointsList .subpoint-card");
-    const last=cards[cards.length-1];
-    if(last) setTimeout(()=>last.scrollIntoView({behavior:"smooth",block:"start"}),50);
-    try{schedulePersist();}catch(e){console.warn("Autosave do item:",e);}
+    schedulePersist();
+    setTimeout(()=>{
+      const cards=document.querySelectorAll("#subpointsList .subpoint-card");
+      const last=cards[cards.length-1];
+      if(last)last.scrollIntoView({behavior:"smooth",block:"start"});
+    },60);
   }catch(e){
-    console.error("Erro ao adicionar item:",e);
-    alert("Não foi possível adicionar o item. Recarregue a página e tente novamente.");
+    console.error("ERRO ADICIONAR ITEM:",e);
+    alert("Erro ao adicionar o ITEM: "+(e?.message||e));
   }
 }
 function removeSubpoint(i){
@@ -1037,7 +1040,12 @@ function removeSubPhoto(i,k){currentSubpoints[i].photos[k]=null;renderSubpoints(
 function subPhotoHTML(sp,i){let h='<div class="sub-photo-grid">';for(let k=0;k<20;k++){let p=sp.photos[k];h+=`<div class="sub-photo-slot" onclick="subPhotoCamera(${i},${k})">${p?`<img src="${p.data}"><button class="remove" onclick="event.stopPropagation();removeSubPhoto(${i},${k})">×</button>`:`📷<br>FOTO ${String(k+1).padStart(2,"0")}`}</div>`}return h+"</div>"}
 
 function renderSubpoints(){
-  subpointsList.innerHTML="";if(!currentSubpoints.length)currentSubpoints=[ensureSubpoint()];currentSubpoints=currentSubpoints.map(ensureSubpoint);
+  const list=document.getElementById("subpointsList");
+  if(!list){console.error("Área de itens não encontrada: #subpointsList");return;}
+  list.innerHTML="";
+  if(!Array.isArray(currentSubpoints)) currentSubpoints=[];
+  if(!currentSubpoints.length) currentSubpoints=[ensureSubpoint()];
+  currentSubpoints=currentSubpoints.map(sp=>ensureSubpoint(sp));
   currentSubpoints.forEach((sp,i)=>{
     const assets=sp.assets.map((x,j)=>{
       const extra=x.type==="TRANSFORMADOR"
@@ -1065,9 +1073,9 @@ function renderSubpoints(){
       <div class="sub-section"><div class="sub-section-title">Materiais Aplicados</div>${mats||'<div class="muted">Nenhum material.</div>'}<button class="btn btn-secondary" onclick="openSubEditor('material',${i})">ADICIONAR MATERIAL</button>${materialEditorHTML(i)}</div>
       <div class="sub-section"><div class="sub-section-title">Serviços Executados</div>${srvs||'<div class="muted">Nenhum serviço.</div>'}<button class="btn btn-secondary" onclick="openSubEditor('service',${i})">ADICIONAR SERVIÇO</button>${serviceEditorHTML(i)}</div>
       <div class="sub-section"><div class="sub-section-title">Fotos do Item — até 20</div><div class="row"><button class="btn btn-secondary" onclick="subPhotoCamera(${i})">📷 Tirar foto</button><button class="btn btn-outline" onclick="subPhotoGallery(${i})">🖼️ Galeria</button></div>${subPhotoHTML(sp,i)}<div class="muted">${sp.photos.filter(Boolean).length} de 20 fotos</div></div>`;
-    subpointsList.appendChild(d);
+    list.appendChild(d);
   });
-  subpointsList.querySelectorAll("[data-sub]").forEach(el=>el.addEventListener(el.tagName==="SELECT"?"change":"input",e=>{const i=+e.target.dataset.sub,k=e.target.dataset.k;currentSubpoints[i][k]=k==="qty"?(parseInt(e.target.value)||0):e.target.value;if(k==="action")renderSubpoints();schedulePersist()}));
+  list.querySelectorAll("[data-sub]").forEach(el=>el.addEventListener(el.tagName==="SELECT"?"change":"input",e=>{const i=+e.target.dataset.sub,k=e.target.dataset.k;currentSubpoints[i][k]=k==="qty"?(parseInt(e.target.value)||0):e.target.value;if(k==="action")renderSubpoints();schedulePersist()}));
 }
 function normalizeSubpointsFromPoint(p){
  let arr=Array.isArray(p.subpoints)&&p.subpoints.length?p.subpoints.map(ensureSubpoint):[ensureSubpoint({action:p.action||normalizeAction(p.postSituation)||"",structure:p.structure||"",qty:p.structureQty||1})];
@@ -1650,18 +1658,9 @@ window.addEventListener("beforeunload",()=>{
 
 document.addEventListener("DOMContentLoaded",()=>{
   try{
-    if(!Array.isArray(currentSubpoints) || !currentSubpoints.length){
-      currentSubpoints=[ensureSubpoint()];
-    }
+    if(!Array.isArray(currentSubpoints)) currentSubpoints=[];
+    if(!currentSubpoints.length) currentSubpoints.push(ensureSubpoint());
     renderSubpoints();
-    const btn=document.getElementById("btnAddItem");
-    if(btn){
-      btn.type="button";
-      btn.addEventListener("touchend",(e)=>{
-        e.preventDefault();
-        addSubpoint();
-      },{passive:false});
-    }
   }catch(e){console.error("Inicialização dos itens:",e);}
 });
 
