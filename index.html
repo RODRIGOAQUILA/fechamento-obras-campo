@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <meta name="theme-color" content="#0f172a" />
-  <title>Equatorial - Fechamento de Obra v8</title>
+  <title>Equatorial - Fechamento de Obra v9</title>
 
   <!-- Leaflet (mapa). Os dados do formulário continuam salvos mesmo sem internet.
        Sem internet, apenas o mapa-base do OpenStreetMap pode não carregar. -->
@@ -113,6 +113,11 @@
     .id-row{grid-template-columns:1fr 1fr 42px}
     .icon-btn{height:42px;border:0;border-radius:10px;background:#fee2e2;color:#991b1b;font-weight:900;cursor:pointer}
 
+    .sub-photo-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:7px;margin-top:8px}
+    .sub-photo-slot{position:relative;aspect-ratio:1;border:1px dashed #94a3b8;border-radius:9px;overflow:hidden;background:#fff;display:flex;align-items:center;justify-content:center;text-align:center;font-size:11px;color:#64748b}
+    .sub-photo-slot img{width:100%;height:100%;object-fit:cover}.sub-photo-slot .remove{position:absolute;right:2px;top:2px;border:0;border-radius:50%;width:24px;height:24px;background:#b91c1c;color:white}
+    .sub-section{margin-top:12px;padding-top:10px;border-top:1px dashed #cbd5e1}.sub-section-title{font-weight:800;margin-bottom:7px}
+    @media(max-width:700px){.sub-photo-grid{grid-template-columns:repeat(4,1fr)}}
     .subpoint-card{border:1px solid #cbd5e1;border-radius:14px;padding:14px;margin:10px 0;background:#f8fafc}
     .subpoint-head{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:10px}
     .subpoint-head b{color:#0f172a}
@@ -337,17 +342,6 @@
       </div>
 
       <div class="divider"></div>
-
-      <h3>Registro Fotográfico — até 20 fotos</h3>
-      <div class="muted" style="margin-bottom:10px">Recomendado: visão geral, estrutura/poste e identificação do ativo. As demais podem registrar detalhes e interferências.</div>
-      <div class="row no-print" style="margin-bottom:10px">
-        <button class="btn btn-secondary" onclick="addPhotoFromCamera()">📷 Tirar foto</button>
-        <button class="btn btn-outline" onclick="addPhotoFromGallery()">🖼️ Escolher da galeria</button>
-      </div>
-      <div id="photoGrid" class="photo-grid"></div>
-      <input id="photoInput" type="file" accept="image/*" capture="environment" style="display:none">
-      <input id="galleryInput" type="file" accept="image/*" multiple style="display:none">
-      <div id="photoCount" class="muted" style="margin-top:8px">0 de 20 fotos</div>
 
       <div class="divider"></div>
 
@@ -924,60 +918,72 @@ function structureOptions(selected=""){
   });
   return h;
 }
-function addSubpoint(data={action:"",structure:"",qty:1,otherAction:""}){
-  currentSubpoints.push({id:uid("sub"),action:data.action||"",structure:data.structure||"",qty:Number(data.qty)||1,otherAction:data.otherAction||""});
-  renderSubpoints();schedulePersist();
-}
+function addSubpoint(data={}){currentSubpoints.push(ensureSubpoint(data));renderSubpoints();schedulePersist();}
 function removeSubpoint(i){
   if(currentSubpoints.length<=1){alert("O ponto deve possuir pelo menos um subponto.");return;}
   currentSubpoints.splice(i,1);renderSubpoints();schedulePersist();
 }
+
+function ensureSubpoint(sp={}){
+  return {id:sp.id||uid("sub"),action:sp.action||"",structure:sp.structure||"",qty:Number(sp.qty)||1,otherAction:sp.otherAction||"",
+    assets:Array.isArray(sp.assets)?sp.assets:[],materials:Array.isArray(sp.materials)?sp.materials:[],
+    services:Array.isArray(sp.services)?sp.services:[],photos:Array.isArray(sp.photos)?sp.photos.slice(0,20):[]};
+}
+function addSubAsset(i){
+  const tipo=prompt("Tipo do ativo:","POSTE");if(!tipo)return;
+  const numero=prompt("Nº Patrimônio / Identificação:","");if(numero===null)return;
+  currentSubpoints[i].assets.push({id:uid("asset"),type:tipo.trim().toUpperCase(),number:numero.trim()});renderSubpoints();schedulePersist();
+}
+function removeSubAsset(i,j){currentSubpoints[i].assets.splice(j,1);renderSubpoints();schedulePersist();}
+function addSubMaterial(i){
+  const q=prompt("Digite parte do código ou descrição do material:","");if(!q)return;
+  const z=q.toUpperCase();const a=MATERIALS.filter(x=>(`${x.code||""} ${x.name||""} ${x.label||""}`).toUpperCase().includes(z)).slice(0,10);
+  if(!a.length){alert("Material não encontrado.");return}
+  const n=parseInt(prompt(a.map((x,k)=>`${k+1}. ${x.code||""} - ${x.name||x.label||""}`).join("\n"),"1"))-1;if(!a[n])return;
+  const x=a[n],qty=parseFloat((prompt(`Quantidade (${x.unit||"un"}):`,"1")||"0").replace(",","."));if(!(qty>0))return;
+  currentSubpoints[i].materials.push({id:uid("mat"),code:x.code||"",name:x.name||x.label||"",unit:x.unit||"",qty});renderSubpoints();schedulePersist();
+}
+function removeSubMaterial(i,j){currentSubpoints[i].materials.splice(j,1);renderSubpoints();schedulePersist();}
+function addSubService(i){
+  const q=prompt("Digite parte do código ou descrição do serviço:","");if(!q)return;
+  const z=q.toUpperCase();const a=SERVICES.filter(x=>(`${x.code||""} ${x.name||""} ${x.label||""}`).toUpperCase().includes(z)).slice(0,10);
+  if(!a.length){alert("Serviço não encontrado.");return}
+  const n=parseInt(prompt(a.map((x,k)=>`${k+1}. ${x.code||""} - ${x.name||x.label||""}`).join("\n"),"1"))-1;if(!a[n])return;
+  const x=a[n];currentSubpoints[i].services.push({id:uid("srv"),code:x.code||"",name:x.name||x.label||"",unit:x.unit||"",training:!!x.training});renderSubpoints();schedulePersist();
+}
+function removeSubService(i,j){currentSubpoints[i].services.splice(j,1);renderSubpoints();schedulePersist();}
+let subPhotoTarget={sub:0,slot:0};
+function subPhotoCamera(i,k=null){const sp=currentSubpoints[i];if(k===null)k=[...Array(20).keys()].find(x=>!sp.photos[x]);if(k===undefined){alert("Limite de 20 fotos.");return}subPhotoTarget={sub:i,slot:k};subPhotoInput.value="";subPhotoInput.click()}
+function subPhotoGallery(i){subPhotoTarget={sub:i,slot:null};subGalleryInput.value="";subGalleryInput.click()}
+function removeSubPhoto(i,k){currentSubpoints[i].photos[k]=null;renderSubpoints();schedulePersist()}
+function subPhotoHTML(sp,i){let h='<div class="sub-photo-grid">';for(let k=0;k<20;k++){let p=sp.photos[k];h+=`<div class="sub-photo-slot" onclick="subPhotoCamera(${i},${k})">${p?`<img src="${p.data}"><button class="remove" onclick="event.stopPropagation();removeSubPhoto(${i},${k})">×</button>`:`📷<br>FOTO ${String(k+1).padStart(2,"0")}`}</div>`}return h+"</div>"}
+
 function renderSubpoints(){
-  subpointsList.innerHTML="";
-  if(!currentSubpoints.length) currentSubpoints=[{id:uid("sub"),action:"",structure:"",qty:1,otherAction:""}];
+  subpointsList.innerHTML="";if(!currentSubpoints.length)currentSubpoints=[ensureSubpoint()];currentSubpoints=currentSubpoints.map(ensureSubpoint);
   currentSubpoints.forEach((sp,i)=>{
-    const div=document.createElement("div"); div.className="subpoint-card";
-    div.innerHTML=`
-      <div class="subpoint-head"><b>SUBPONTO ${i+1}</b>${i?`<button class="btn btn-danger" onclick="removeSubpoint(${i})">Excluir</button>`:""}</div>
+    const assets=sp.assets.map((x,j)=>`<div class="list-card"><b>${escapeHtml(x.type||"ATIVO")}</b> — ${escapeHtml(x.number||"")} <button class="btn btn-danger" onclick="removeSubAsset(${i},${j})">Excluir</button></div>`).join("");
+    const mats=sp.materials.map((x,j)=>`<div class="list-card"><b>${escapeHtml(`${x.code||""}${x.code?" - ":""}${x.name||""}`)}</b> · ${x.qty||0} ${escapeHtml(x.unit||"")} <button class="btn btn-danger" onclick="removeSubMaterial(${i},${j})">Excluir</button></div>`).join("");
+    const srvs=sp.services.map((x,j)=>`<div class="list-card"><b style="${x.training?"color:#15803d":""}">${escapeHtml(`${x.code||""}${x.code?" - ":""}${x.name||""}`)}</b> <button class="btn btn-danger" onclick="removeSubService(${i},${j})">Excluir</button></div>`).join("");
+    const d=document.createElement("div");d.className="subpoint-card";d.innerHTML=`
+      <div class="subpoint-head"><b>SUBPONTO ${i+1}</b>${i?`<button class="btn btn-danger" onclick="removeSubpoint(${i})">Excluir subponto</button>`:""}</div>
       <div class="subpoint-grid">
-        <div>
-          <label>Ação *</label>
-          <select data-sub="${i}" data-k="action">
-            <option value="">Selecione...</option>
-            ${["INSTALAR","RETIRAR","TRANSFORMAR","REALOCAR","MANTER","MODIFICAR","TENSIONAR","OUTRO"].map(x=>`<option ${sp.action===x?"selected":""}>${x}</option>`).join("")}
-          </select>
-        </div>
-        <div>
-          <label>Estrutura *</label>
-          <select data-sub="${i}" data-k="structure">${structureOptions(sp.structure)}</select>
-        </div>
-        <div>
-          <label>Quantidade de estrutura *</label>
-          <input data-sub="${i}" data-k="qty" type="number" min="1" step="1" value="${sp.qty||1}" inputmode="numeric">
-        </div>
-        <div class="other-action-wrap" style="${sp.action==="OUTRO"?"":"display:none"}">
-          <label>Outra ação *</label>
-          <input data-sub="${i}" data-k="otherAction" value="${escapeHtml(sp.otherAction||"")}" placeholder="Digite a ação executada">
-        </div>
-      </div>`;
-    subpointsList.appendChild(div);
+       <div><label>Ação *</label><select data-sub="${i}" data-k="action"><option value="">Selecione...</option>${["INSTALAR","RETIRAR","TRANSFORMAR","REALOCAR","MANTER","MODIFICAR","TENSIONAR","OUTRO"].map(x=>`<option ${sp.action===x?"selected":""}>${x}</option>`).join("")}</select></div>
+       <div><label>Estrutura *</label><select data-sub="${i}" data-k="structure">${structureOptions(sp.structure)}</select></div>
+       <div><label>Quantidade de estrutura *</label><input data-sub="${i}" data-k="qty" type="number" min="1" value="${sp.qty||1}"></div>
+       <div style="${sp.action==="OUTRO"?"":"display:none"}"><label>Outra ação *</label><input data-sub="${i}" data-k="otherAction" value="${escapeHtml(sp.otherAction||"")}" placeholder="Digite a ação"></div>
+      </div>
+      <div class="sub-section"><div class="sub-section-title">Ativos / Patrimônios</div>${assets||'<div class="muted">Nenhum ativo.</div>'}<button class="btn btn-secondary" onclick="addSubAsset(${i})">+ Adicionar ativo</button></div>
+      <div class="sub-section"><div class="sub-section-title">Materiais Aplicados</div>${mats||'<div class="muted">Nenhum material.</div>'}<button class="btn btn-secondary" onclick="addSubMaterial(${i})">+ Adicionar material</button></div>
+      <div class="sub-section"><div class="sub-section-title">Serviços Executados</div>${srvs||'<div class="muted">Nenhum serviço.</div>'}<button class="btn btn-secondary" onclick="addSubService(${i})">+ Adicionar serviço</button></div>
+      <div class="sub-section"><div class="sub-section-title">Fotos do Subponto — até 20</div><div class="row"><button class="btn btn-secondary" onclick="subPhotoCamera(${i})">📷 Tirar foto</button><button class="btn btn-outline" onclick="subPhotoGallery(${i})">🖼️ Galeria</button></div>${subPhotoHTML(sp,i)}<div class="muted">${sp.photos.filter(Boolean).length} de 20 fotos</div></div>`;
+    subpointsList.appendChild(d);
   });
-  subpointsList.querySelectorAll("input,select").forEach(el=>{
-    const evt=el.tagName==="SELECT"?"change":"input";
-    el.addEventListener(evt,e=>{
-      const i=+e.target.dataset.sub,k=e.target.dataset.k;
-      currentSubpoints[i][k]=k==="qty"?(parseInt(e.target.value)||0):e.target.value;
-      if(k==="action") renderSubpoints();
-      schedulePersist();
-    });
-  });
+  subpointsList.querySelectorAll("[data-sub]").forEach(el=>el.addEventListener(el.tagName==="SELECT"?"change":"input",e=>{const i=+e.target.dataset.sub,k=e.target.dataset.k;currentSubpoints[i][k]=k==="qty"?(parseInt(e.target.value)||0):e.target.value;if(k==="action")renderSubpoints();schedulePersist()}));
 }
 function normalizeSubpointsFromPoint(p){
-  if(Array.isArray(p.subpoints)&&p.subpoints.length) return JSON.parse(JSON.stringify(p.subpoints));
-  if(p.action||p.structure||p.postSituation){
-    return [{id:uid("sub"),action:p.action||normalizeAction(p.postSituation)||"",structure:p.structure||"",qty:p.structureQty||1,otherAction:""}];
-  }
-  return [{id:uid("sub"),action:"",structure:"",qty:1,otherAction:""}];
+ let arr=Array.isArray(p.subpoints)&&p.subpoints.length?p.subpoints.map(ensureSubpoint):[ensureSubpoint({action:p.action||normalizeAction(p.postSituation)||"",structure:p.structure||"",qty:p.structureQty||1})];
+ if(arr[0]){if(!arr[0].assets.length&&p.identifications)arr[0].assets=JSON.parse(JSON.stringify(p.identifications));if(!arr[0].materials.length&&p.materials)arr[0].materials=JSON.parse(JSON.stringify(p.materials));if(!arr[0].services.length)arr[0].services=servicesForPoint(p);if(!arr[0].photos.length&&p.photos)arr[0].photos=JSON.parse(JSON.stringify(p.photos)).slice(0,20)}
+ return arr;
 }
 
 /* FOTOS */
@@ -1092,7 +1098,7 @@ async function savePoint(){
     if(!sp.structure){alert(`Informe a Estrutura do Subponto ${i+1}.`);return}
     if(!(Number(sp.qty)>0)){alert(`Informe a Quantidade de Estrutura do Subponto ${i+1}.`);return}
   }
-  if(!p.services?.length){alert("Adicione pelo menos um Serviço Executado.");return}
+  for(let i=0;i<p.subpoints.length;i++){if(!p.subpoints[i].services?.length){alert(`Adicione pelo menos um Serviço no Subponto ${i+1}.`);return}}
   if(!p.conformity){alert("Informe se o ponto está conforme ou com ajuste ao projeto.");return}
   if(p.conformity==="AJUSTE" && (!p.adjustReason || !p.changed)){
     alert("Informe o motivo do ajuste e o que foi alterado.");return;
@@ -1113,12 +1119,12 @@ async function savePoint(){
 
 function newPoint(clearDraft=true){
   editingPointId=null;
-  currentPhotos=new Array(20).fill(null);currentMaterials=[];currentIdentifications=[];currentServices=[];currentSubpoints=[{id:uid("sub"),action:"",structure:"",qty:1,otherAction:""}];currentConformity="";suggestedServiceCode="";
+  currentPhotos=new Array(20).fill(null);currentMaterials=[];currentIdentifications=[];currentServices=[];currentSubpoints=[ensureSubpoint()];currentConformity="";suggestedServiceCode="";
   pLat.value="";pLng.value="";pProjectPoint.value="";pCrewType.value="";
   sSearch.value="";sSelected.value="";serviceAdder.style.display="none";
   pAdjustReason.value="";pChanged.value="";pNotes.value="";
   togglePostFields();setConformity("");
-  renderSubpoints();renderIdentifications();renderServices();renderMaterials();renderPhotoGrid();
+  renderSubpoints();
   pointTitle.textContent="Novo Ponto";
   pointCodeBadge.textContent=pointCode(nextPointNumber());
   pointCodeBadge.className="badge badge-gray";
@@ -1133,11 +1139,10 @@ function editPoint(id){
   currentServices=servicesForPoint(p);
   currentIdentifications=JSON.parse(JSON.stringify(p.identifications||[])).map(x=>({...x,type:normalizeAssetType(x.type)}));
   currentMaterials=JSON.parse(JSON.stringify(p.materials||[]));
-  currentPhotos=new Array(20).fill(null);
-  (p.photos||[]).slice(0,20).forEach((ph,i)=>currentPhotos[i]=ph);
+  currentPhotos=[];
   currentConformity=p.conformity||"";
   pAdjustReason.value=p.adjustReason||"";pChanged.value=p.changed||"";pNotes.value=p.notes||"";
-  renderSubpoints();renderIdentifications();renderServices();renderMaterials();renderPhotoGrid();togglePostFields();setConformity(currentConformity);
+  renderSubpoints();togglePostFields();setConformity(currentConformity);
   pointTitle.textContent="Editar "+p.code;
   pointCodeBadge.textContent=p.code;
   pointCodeBadge.className="badge badge-yellow";
@@ -1185,6 +1190,10 @@ function populateCableSelect(){
       sCable.appendChild(opt);
     });
 }
+
+
+subPhotoInput.addEventListener("change",async e=>{const f=e.target.files?.[0];if(!f)return;const sp=currentSubpoints[subPhotoTarget.sub];const data=await compressImage(f,1600,.75);sp.photos[subPhotoTarget.slot]={id:uid("photo"),data,name:f.name,createdAt:nowISO()};renderSubpoints();schedulePersist()});
+subGalleryInput.addEventListener("change",async e=>{const sp=currentSubpoints[subPhotoTarget.sub];for(const f of [...(e.target.files||[])]){const k=[...Array(20).keys()].find(x=>!sp.photos[x]);if(k===undefined)break;const data=await compressImage(f,1600,.75);sp.photos[k]={id:uid("photo"),data,name:f.name,createdAt:nowISO()}}renderSubpoints();schedulePersist()});
 
 /* TRECHOS */
 function toggleIsolatedSegment(){
@@ -1452,10 +1461,10 @@ function loadDraft(p){
   currentServices=servicesForPoint(p);
   currentIdentifications=JSON.parse(JSON.stringify(p.identifications||[])).map(x=>({...x,type:normalizeAssetType(x.type)}));
   currentMaterials=JSON.parse(JSON.stringify(p.materials||[]));
-  currentPhotos=new Array(20).fill(null);(p.photos||[]).slice(0,20).forEach((x,i)=>currentPhotos[i]=x);
+  currentPhotos=[];
   currentConformity=p.conformity||"";
   pAdjustReason.value=p.adjustReason||"";pChanged.value=p.changed||"";pNotes.value=p.notes||"";
-  renderSubpoints();renderIdentifications();renderServices();renderMaterials();renderPhotoGrid();togglePostFields();setConformity(currentConformity);
+  renderSubpoints();togglePostFields();setConformity(currentConformity);
   pointTitle.textContent=editingPointId?"Editar "+p.code:"Ponto em andamento";
   pointCodeBadge.textContent=p.code||pointCode(nextPointNumber());
 }
@@ -1536,5 +1545,5 @@ window.addEventListener("beforeunload",()=>{
   setStatus(`Salvo · ${app.points.length} ponto(s) · ${app.segments.length} trecho(s)`);
 })();
 </script>
-</body>
+<input id="subPhotoInput" type="file" accept="image/*" capture="environment" style="display:none"><input id="subGalleryInput" type="file" accept="image/*" multiple style="display:none"></body>
 </html>
