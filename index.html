@@ -251,7 +251,7 @@
           </select>
         </div>
         <div>
-          <label>Ponto do Projeto</label>
+          <label>Nº PONTO PROJ.</label>
           <input id="pProjectPoint" placeholder="Ex.: P-01, P05, POSTE 12 ou referência da prancha">
         </div>
       </div>
@@ -266,14 +266,14 @@
       <div class="divider"></div>
 
       <h3>Ativos / Patrimônios</h3>
-      <div class="muted">Cadastre somente equipamentos que possuam número de patrimônio ou identificação individual.</div>
+      
       <div id="identifications"></div>
       <button class="btn btn-secondary" onclick="addIdentification()">+ Adicionar ativo</button>
 
       <div class="divider"></div>
 
       <h3>Serviços Executados</h3>
-      <div class="section-note">Cada serviço é selecionado em um único campo no formato <b>CÓDIGO - DESCRIÇÃO</b>. É possível registrar vários serviços no mesmo ponto.</div>
+      
       <div id="servicesList"></div>
       <button class="btn btn-secondary" onclick="openServiceAdder()">+ Adicionar serviço</button>
 
@@ -293,7 +293,7 @@
       <div class="divider"></div>
 
       <h3>Materiais Aplicados</h3>
-      <div class="section-note">Os materiais mais utilizados aparecem destacados por cor. A lista completa permanece em ordem alfabética e pode ser pesquisada.</div>
+      
       <div id="materials"></div>
       <button class="btn btn-secondary" onclick="openMaterialAdder()">+ Adicionar material</button>
 
@@ -328,20 +328,7 @@
       </div>
 
       <div class="divider"></div>
-
-      <h3>Conferência com o Projeto *</h3>
-      <div class="choice-group">
-        <button id="choiceOk" class="choice ok" onclick="setConformity('CONFORME')">✓ PONTO CONFORME PROJETO</button>
-        <button id="choiceAdjust" class="choice adjust" onclick="setConformity('AJUSTE')">⚠ PONTO COM AJUSTE AO PROJETO</button>
-      </div>
-      <div id="adjustFields" style="display:none;margin-top:12px">
-        <div class="grid grid-2">
-          <div><label>Motivo do ajuste *</label><textarea id="pAdjustReason"></textarea></div>
-          <div><label>O que foi alterado? *</label><textarea id="pChanged"></textarea></div>
-        </div>
-      </div>
-
-      <div class="divider"></div>
+<div class="divider"></div>
 
       <div class="divider"></div>
 
@@ -1296,16 +1283,16 @@ function pointSummaryCard(p){
   const photos=(p.photos||[]).length;
   return `<div class="row" style="justify-content:space-between;align-items:flex-start">
       <div><div class="title">${escapeHtml(p.code)}</div><div class="meta">${localDateTime(p.createdAt)} · ${p.lat?.toFixed?.(6)??p.lat}, ${p.lng?.toFixed?.(6)??p.lng}</div></div>
-      ${p.conformity==="CONFORME"?'<span class="badge badge-green">CONFORME PROJETO</span>':'<span class="badge badge-yellow">COM AJUSTE</span>'}
+      
     </div>
     <div class="divider"></div>
     <div><b>Tipo de Turma:</b> ${escapeHtml(p.crewType||"—")}</div>
-    <div><b>Ponto do Projeto:</b> ${escapeHtml(p.projectPoint||"—")}</div>
+    <div><b>Nº PONTO PROJ.:</b> ${escapeHtml(p.projectPoint||"—")}</div>
     <div style="margin-top:10px"><b>Estruturas / Subpontos</b>${subs?`<ul>${subs}</ul>`:""}</div>
     <div style="margin-top:10px"><b>Ativos / Patrimônios</b>${ids?`<ul>${ids}</ul>`:'<div class="muted">Nenhum.</div>'}</div>
     <div style="margin-top:10px"><b>Serviços executados</b>${srvs?`<ul>${srvs}</ul>`:'<div class="muted">Nenhum.</div>'}</div>
     <div style="margin-top:10px"><b>Materiais aplicados</b>${mats?`<ul>${mats}</ul>`:'<div class="muted">Nenhum.</div>'}</div>
-    ${p.conformity==="AJUSTE"?`<div style="margin-top:10px"><b>Motivo do ajuste:</b> ${escapeHtml(p.adjustReason||"—")}<br><b>Alteração realizada:</b> ${escapeHtml(p.changed||"—")}</div>`:""}
+    
     <div style="margin-top:10px"><b>Observações:</b> ${escapeHtml(p.notes||"—")}<br><b>Fotos registradas:</b> ${photos} de 20</div>`;
 }
 function segmentSummaryCard(s){
@@ -1364,7 +1351,7 @@ function renderSummaryPoints(){
 
         <div class="divider"></div>
         <div class="grid grid-2">
-          <div><b>Ponto do Projeto:</b><br>${escapeHtml(p.projectPoint||"—")}</div>
+          <div><b>Nº PONTO PROJ.:</b><br>${escapeHtml(p.projectPoint||"—")}</div>
           <div><b>Ação:</b><br>${escapeHtml(p.action||normalizeAction(p.postSituation)||"—")}</div>
           <div><b>Tipo de Turma:</b><br>${escapeHtml(p.crewType||"—")}</div>
           <div><b>Estrutura:</b><br>${escapeHtml(p.structure||"—")} · Qtd: ${p.structureQty||0}</div>
