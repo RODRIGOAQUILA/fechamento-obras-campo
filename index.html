@@ -270,7 +270,7 @@
       <h3 class="items-title">Estruturas / Items do Ponto</h3>
       
       <div id="subpointsList"></div>
-      <button class="btn btn-secondary" onclick="addSubpoint()">ADICIONAR ITEM</button>
+      <button id="btnAddItem" type="button" class="btn btn-secondary" onclick="addSubpoint()">ADICIONAR ITEM</button>
 
       <div class="divider"></div>
 
@@ -858,7 +858,20 @@ function structureOptions(selected=""){
   });
   return h;
 }
-function addSubpoint(data={}){currentSubpoints.push(ensureSubpoint(data));renderSubpoints();schedulePersist();}
+function addSubpoint(data={}){
+  try{
+    if(!Array.isArray(currentSubpoints)) currentSubpoints=[];
+    currentSubpoints.push(ensureSubpoint(data));
+    renderSubpoints();
+    const cards=document.querySelectorAll("#subpointsList .subpoint-card");
+    const last=cards[cards.length-1];
+    if(last) setTimeout(()=>last.scrollIntoView({behavior:"smooth",block:"start"}),50);
+    try{schedulePersist();}catch(e){console.warn("Autosave do item:",e);}
+  }catch(e){
+    console.error("Erro ao adicionar item:",e);
+    alert("Não foi possível adicionar o item. Recarregue a página e tente novamente.");
+  }
+}
 function removeSubpoint(i){
   if(currentSubpoints.length<=1){alert("O ponto deve possuir pelo menos um item.");return;}
   currentSubpoints.splice(i,1);renderSubpoints();schedulePersist();
@@ -1634,6 +1647,24 @@ window.addEventListener("beforeunload",()=>{
   }
   setStatus(`Salvo · ${app.points.length} ponto(s) · ${app.segments.length} trecho(s)`);
 })();
+
+document.addEventListener("DOMContentLoaded",()=>{
+  try{
+    if(!Array.isArray(currentSubpoints) || !currentSubpoints.length){
+      currentSubpoints=[ensureSubpoint()];
+    }
+    renderSubpoints();
+    const btn=document.getElementById("btnAddItem");
+    if(btn){
+      btn.type="button";
+      btn.addEventListener("touchend",(e)=>{
+        e.preventDefault();
+        addSubpoint();
+      },{passive:false});
+    }
+  }catch(e){console.error("Inicialização dos itens:",e);}
+});
+
 </script>
 <input id="subPhotoInput" type="file" accept="image/*" capture="environment" style="display:none"><input id="subGalleryInput" type="file" accept="image/*" multiple style="display:none"></body>
 </html>
