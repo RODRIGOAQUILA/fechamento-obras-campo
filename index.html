@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <meta name="theme-color" content="#0f172a" />
-  <title>Equatorial - Fechamento de Obra v12</title>
+  <title>Equatorial - Fechamento de Obra v12.3</title>
 
   <!-- Leaflet (mapa). Os dados do formulário continuam salvos mesmo sem internet.
        Sem internet, apenas o mapa-base do OpenStreetMap pode não carregar. -->
@@ -841,19 +841,19 @@ function findServiceByCode(code){
 function applyMeasurementRule(){ /* filtros independentes: sem autopreenchimento */ schedulePersist(); }
 
 /* ITEMS / ESTRUTURAS DO PONTO */
-const STRUCTURE_OPTIONS = [
-  ["PROJETO / LEGADO",["S1","S1I"]],
-  ["CONVENCIONAIS COM CRUZETA",["N1","B1","M1","T1","N2","B2","M2","T2","N3","B3","M3","T3","N4","B4","M4","TE","T4"]],
-  ["MONOFÁSICAS SEM CRUZETA",["U1","UP1","UT1","U2","U3","UP3","U4","UP4"]],
-  ["SEM CRUZETA / ESPECIAIS",["P1","BP1","P3","BP3","P4","BP4","HT","HTE"]],
-  ["RDC – REDE DE DISTRIBUIÇÃO COMPACTA",["CE1","CE1-A","CJE","CJE-A","CE2","CE3","CUF3","CE4","CUF4","N3S-CE","N3S-CE-PR","DN-CE","CE-DS/TS","NS/BS"]],
-  ["OUTRAS ESTRUTURAS",["ESTRUTURA DE BT","ESTRUTURA DE MT","ESTRUTURA COM TRANSFORMADOR","ESTRUTURA COM CHAVE","ESTRUTURA COM ESTAI","ESTRUTURA EXISTENTE","NÃO SE APLICA","OUTRA"]]
-];
 function structureOptions(selected=""){
+  const groups=[
+    ["PROJETO / LEGADO",["S1","S1I"]],
+    ["CONVENCIONAIS COM CRUZETA",["N1","B1","M1","T1","N2","B2","M2","T2","N3","B3","M3","T3","N4","B4","M4","TE","T4"]],
+    ["MONOFÁSICAS SEM CRUZETA",["U1","UP1","UT1","U2","U3","UP3","U4","UP4"]],
+    ["SEM CRUZETA / ESPECIAIS",["P1","BP1","P3","BP3","P4","BP4","HT","HTE"]],
+    ["RDC – REDE DE DISTRIBUIÇÃO COMPACTA",["CE1","CE1-A","CJE","CJE-A","CE2","CE3","CUF3","CE4","CUF4","N3S-CE","N3S-CE-PR","DN-CE","CE-DS/TS","NS/BS"]],
+    ["OUTRAS ESTRUTURAS",["ESTRUTURA DE BT","ESTRUTURA DE MT","ESTRUTURA COM TRANSFORMADOR","ESTRUTURA COM CHAVE","ESTRUTURA COM ESTAI","ESTRUTURA EXISTENTE","NÃO SE APLICA","OUTRA"]]
+  ];
   let h='<option value="">Selecione a estrutura...</option>';
-  STRUCTURE_OPTIONS.forEach(([g,items])=>{
+  groups.forEach(([g,items])=>{
     h+=`<optgroup label="${escapeHtml(g)}">`;
-    items.forEach(x=>h+=`<option ${selected===x?"selected":""}>${escapeHtml(x)}</option>`);
+    items.forEach(x=>h+=`<option value="${escapeHtml(x)}" ${selected===x?"selected":""}>${escapeHtml(x)}</option>`);
     h+='</optgroup>';
   });
   return h;
@@ -872,7 +872,7 @@ function addSubpoint(data={}){
     },60);
   }catch(e){
     console.error("ERRO ADICIONAR ITEM:",e);
-    alert("Erro ao adicionar o ITEM: "+(e?.message||e));
+    alert("Não foi possível adicionar o ITEM. Detalhe: "+(e?.message||e));
   }
 }
 function removeSubpoint(i){
