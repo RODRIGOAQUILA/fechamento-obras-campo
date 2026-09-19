@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <meta name="theme-color" content="#0f172a" />
-  <title>Equatorial - Fechamento de Obra v9</title>
+  <title>Equatorial - Fechamento de Obra v12</title>
 
   <!-- Leaflet (mapa). Os dados do formulário continuam salvos mesmo sem internet.
        Sem internet, apenas o mapa-base do OpenStreetMap pode não carregar. -->
@@ -112,6 +112,13 @@
     .material-row,.id-row{display:grid;grid-template-columns:1fr 110px 90px 42px;gap:8px;margin:8px 0;align-items:end}
     .id-row{grid-template-columns:1fr 1fr 42px}
     .icon-btn{height:42px;border:0;border-radius:10px;background:#fee2e2;color:#991b1b;font-weight:900;cursor:pointer}
+
+
+    .items-title{
+      background:#0b0b6f;color:#fff;text-align:center;font-weight:800;
+      padding:11px 14px;border-radius:10px;margin:4px 0 14px;
+      letter-spacing:.2px
+    }
 
     .sub-photo-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:7px;margin-top:8px}
     .sub-photo-slot{position:relative;aspect-ratio:1;border:1px dashed #94a3b8;border-radius:9px;overflow:hidden;background:#fff;display:flex;align-items:center;justify-content:center;text-align:center;font-size:11px;color:#64748b}
@@ -260,77 +267,12 @@
 
       <div class="divider"></div>
 
-      <h3>Estruturas / Items do Ponto</h3>
+      <h3 class="items-title">Estruturas / Items do Ponto</h3>
       
       <div id="subpointsList"></div>
-      <button class="btn btn-secondary" onclick="addSubpoint()">+ Adicionar outro item</button>
+      <button class="btn btn-secondary" onclick="addSubpoint()">ADICIONAR ITEM</button>
 
       <div class="divider"></div>
-
-      <h3>Ativos / Patrimônios</h3>
-      
-      <div id="identifications"></div>
-      <button class="btn btn-secondary" onclick="addIdentification()">+ Adicionar ativo</button>
-
-      <div class="divider"></div>
-
-      <h3>Serviços Executados</h3>
-      
-      <div id="servicesList"></div>
-      <button class="btn btn-secondary" onclick="openServiceAdder()">+ Adicionar serviço</button>
-
-      <div id="serviceAdder" class="list-card" style="display:none">
-        <div class="search-dropdown">
-          <label>Serviço</label>
-          <input id="sSearch" placeholder="🔎 Pesquisar por código ou descrição..." autocomplete="off">
-          <div id="serviceResults" class="search-results"></div>
-          <input id="sSelected" type="hidden">
-        </div>
-        <div class="row" style="margin-top:10px">
-          <button class="btn btn-primary" onclick="confirmService()">Adicionar serviço</button>
-          <button class="btn btn-secondary" onclick="closeServiceAdder()">Cancelar</button>
-        </div>
-      </div>
-
-      <div class="divider"></div>
-
-      <h3>Materiais Aplicados</h3>
-      
-      <div id="materials"></div>
-      <button class="btn btn-secondary" onclick="openMaterialAdder()">+ Adicionar material</button>
-
-      <div id="materialAdder" class="list-card" style="display:none">
-        <div class="grid grid-3">
-          <div class="search-dropdown">
-            <label>Material</label>
-            <input id="mSearch" placeholder="🔎 Pesquisar material..." autocomplete="off">
-            <div id="materialResults" class="search-results"></div>
-            <input id="mSelected" type="hidden">
-          </div>
-          <div>
-            <label>Quantidade</label>
-            <input id="mQty" type="number" min="0" step="0.01" value="1">
-          </div>
-          <div>
-            <label>Unidade</label>
-            <select id="mUnit">
-              <option>UN</option>
-              <option>M</option>
-              <option>KG</option>
-              <option>CJ</option>
-              <option>PC</option>
-              <option>RL</option>
-            </select>
-          </div>
-        </div>
-        <div class="row" style="margin-top:10px">
-          <button class="btn btn-primary" onclick="confirmMaterial()">Adicionar</button>
-          <button class="btn btn-outline" onclick="closeMaterialAdder()">Cancelar</button>
-        </div>
-      </div>
-
-      <div class="divider"></div>
-<div class="divider"></div>
 
       <div class="divider"></div>
 
@@ -356,50 +298,59 @@
   <section id="segmentPanel" class="panel">
     <div class="card">
       <h2>Trechos de Rede</h2>
-      <div class="section-note">O trecho pode ligar dois pontos ou ser registrado como trecho/ponto isolado.</div>
-      <div style="margin-bottom:12px">
-        <label><input id="sIsolated" type="checkbox" onchange="toggleIsolatedSegment()"> Trecho / ponto isolado (não está entre dois pontos)</label>
-      </div>
       <div class="grid grid-2">
-        <div><label>De *</label><select id="sFrom"></select></div>
-        <div><label>Até *</label><select id="sTo"></select></div>
-        <div id="isolatedRefWrap" class="grid-span-2" style="display:none">
-          <label>Referência do trecho / ponto isolado *</label>
-          <input id="sIsolatedRef" placeholder="Ex.: ramal isolado, ponto P-05, poste 12345...">
+        <div>
+          <label>De *</label>
+          <select id="sFrom" onchange="handleSegmentEndpointChange()"></select>
         </div>
+        <div id="sToWrap">
+          <label>Até *</label>
+          <select id="sTo"></select>
+        </div>
+
+        <div id="isolatedRefWrap" class="grid-span-2" style="display:none">
+          <label>Trecho *</label>
+          <input id="sIsolatedRef" placeholder="Digite a identificação ou descrição do trecho">
+        </div>
+
         <div>
           <label>Tipo de rede</label>
           <select id="sNetworkType">
             <option>BT</option><option>MT</option><option>AT</option><option>OUTRO</option>
           </select>
         </div>
+
         <div>
           <label>Condutor / Cabo</label>
           <select id="sCable">
             <option value="">Selecione...</option>
           </select>
         </div>
-        <div><label>Comprimento do projeto (m)</label><input id="sLengthProject" type="number" min="0" step="0.01"></div>
-        <div><label>Comprimento executado (m)</label><input id="sLengthExecuted" type="number" min="0" step="0.01"></div>
+
+        <div>
+          <label>Comprimento executado (m)</label>
+          <input id="sLengthExecuted" type="number" min="0" step="0.01">
+        </div>
+
         <div>
           <label>Serviço / Intervenção</label>
-          <select id="sService">
+          <select id="sService" onchange="toggleOtherSegmentService()">
+            <option value="">Selecione...</option>
             <option>INSTALAR</option>
             <option>SUBSTITUIR</option>
             <option>RETIRAR</option>
             <option>REALOCAR</option>
             <option>MODIFICAR</option>
             <option>MANTER EXISTENTE</option>
+            <option>OUTRO</option>
           </select>
-        </div>
-        <div>
-          <label>Conformidade</label>
-          <select id="sConformity">
-            <option>CONFORME PROJETO</option>
-            <option>COM AJUSTE AO PROJETO</option>
-          </select>
+          <div id="sOtherServiceWrap" style="display:none;margin-top:8px">
+            <label>Informe o Serviço / Intervenção *</label>
+            <input id="sOtherService" placeholder="Digite o serviço / intervenção">
+          </div>
         </div>
       </div>
+
       <div class="row" style="margin-top:12px">
         <button class="btn btn-primary" onclick="saveSegment()">Salvar trecho</button>
       </div>
@@ -941,17 +892,52 @@ function assetEditorHTML(i){
   if(subEditor.type!=="asset"||subEditor.index!==i)return "";
   return `<div id="editor-asset-${i}" class="sub-inline-editor">
     <div class="grid grid-2">
-      <div><label>Tipo de Ativo</label><select id="asset-type-${i}">${ASSET_TYPES.map(x=>`<option>${escapeHtml(x)}</option>`).join("")}</select></div>
+      <div>
+        <label>Tipo de Ativo</label>
+        <select id="asset-type-${i}" onchange="toggleAssetExtraFields(${i})">
+          ${ASSET_TYPES.map(x=>`<option>${escapeHtml(x)}</option>`).join("")}
+        </select>
+      </div>
       <div><label>Nº Patrimônio / Identificação</label><input id="asset-number-${i}" placeholder="Digite o número do ativo"></div>
     </div>
-    <div class="row" style="margin-top:8px"><button class="btn btn-primary" onclick="confirmSubAsset(${i})">Adicionar ativo</button><button class="btn btn-secondary" onclick="closeSubEditor()">Cancelar</button></div>
+    <div id="transformer-extra-${i}" style="display:none;margin-top:10px">
+      <div class="grid grid-2">
+        <div><label>Nº Série</label><input id="asset-serial-${i}" placeholder="Nº de série do transformador"></div>
+        <div><label>Fabricante</label><input id="asset-maker-${i}" placeholder="Fabricante"></div>
+        <div><label>Potência (kVA)</label><input id="asset-power-${i}" type="number" min="0" step="0.01" placeholder="Ex.: 75"></div>
+        <div>
+          <label>Fases</label>
+          <select id="asset-phases-${i}">
+            <option value="">Selecione...</option>
+            <option>MONOFÁSICO</option>
+            <option>TRIFÁSICO</option>
+          </select>
+        </div>
+      </div>
+    </div>
+    <div class="row" style="margin-top:8px">
+      <button class="btn btn-primary" onclick="confirmSubAsset(${i})">ADICIONAR ATIVO</button>
+      <button class="btn btn-secondary" onclick="closeSubEditor()">Cancelar</button>
+    </div>
   </div>`;
+}
+function toggleAssetExtraFields(i){
+  const type=document.getElementById(`asset-type-${i}`)?.value||"";
+  const box=document.getElementById(`transformer-extra-${i}`);
+  if(box)box.style.display=type==="TRANSFORMADOR"?"block":"none";
 }
 function confirmSubAsset(i){
   const type=document.getElementById(`asset-type-${i}`).value;
   const number=document.getElementById(`asset-number-${i}`).value.trim();
   if(!number){alert("Informe o Nº Patrimônio / Identificação.");return}
-  currentSubpoints[i].assets.push({id:uid("asset"),type,number});
+  const asset={id:uid("asset"),type,number};
+  if(type==="TRANSFORMADOR"){
+    asset.serial=(document.getElementById(`asset-serial-${i}`)?.value||"").trim();
+    asset.manufacturer=(document.getElementById(`asset-maker-${i}`)?.value||"").trim();
+    asset.power=(document.getElementById(`asset-power-${i}`)?.value||"").trim();
+    asset.phases=document.getElementById(`asset-phases-${i}`)?.value||"";
+  }
+  currentSubpoints[i].assets.push(asset);
   subEditor={type:null,index:null};renderSubpoints();schedulePersist();
 }
 function removeSubAsset(i,j){currentSubpoints[i].assets.splice(j,1);renderSubpoints();schedulePersist();}
@@ -969,7 +955,7 @@ function materialEditorHTML(i){
       <div><label>Quantidade</label><input id="material-qty-${i}" type="number" min="0.01" step="0.01" value="1"></div>
       <div><label>Unidade</label><input id="material-unit-${i}" readonly placeholder="Automático"></div>
     </div>
-    <div class="row" style="margin-top:8px"><button class="btn btn-primary" onclick="confirmSubMaterial(${i})">Adicionar material</button><button class="btn btn-secondary" onclick="closeSubEditor()">Cancelar</button></div>
+    <div class="row" style="margin-top:8px"><button class="btn btn-primary" onclick="confirmSubMaterial(${i})">ADICIONAR MATERIAL</button><button class="btn btn-secondary" onclick="closeSubEditor()">Cancelar</button></div>
   </div>`;
 }
 function renderSubMaterialResults(i){
@@ -1006,7 +992,7 @@ function serviceEditorHTML(i){
       <div id="service-results-${i}" class="search-results"></div>
       <input id="service-selected-${i}" type="hidden">
     </div>
-    <div class="row" style="margin-top:8px"><button class="btn btn-primary" onclick="confirmSubService(${i})">Adicionar serviço</button><button class="btn btn-secondary" onclick="closeSubEditor()">Cancelar</button></div>
+    <div class="row" style="margin-top:8px"><button class="btn btn-primary" onclick="confirmSubService(${i})">ADICIONAR SERVIÇO</button><button class="btn btn-secondary" onclick="closeSubEditor()">Cancelar</button></div>
   </div>`;
 }
 function renderSubServiceResults(i){
@@ -1040,7 +1026,12 @@ function subPhotoHTML(sp,i){let h='<div class="sub-photo-grid">';for(let k=0;k<2
 function renderSubpoints(){
   subpointsList.innerHTML="";if(!currentSubpoints.length)currentSubpoints=[ensureSubpoint()];currentSubpoints=currentSubpoints.map(ensureSubpoint);
   currentSubpoints.forEach((sp,i)=>{
-    const assets=sp.assets.map((x,j)=>`<div class="list-card"><b>${escapeHtml(x.type||"ATIVO")}</b> — ${escapeHtml(x.number||"")} <button class="btn btn-danger" onclick="removeSubAsset(${i},${j})">Excluir</button></div>`).join("");
+    const assets=sp.assets.map((x,j)=>{
+      const extra=x.type==="TRANSFORMADOR"
+        ? `<div class="meta">${x.serial?`Série: ${escapeHtml(x.serial)} · `:""}${x.manufacturer?`Fabricante: ${escapeHtml(x.manufacturer)} · `:""}${x.power?`Potência: ${escapeHtml(x.power)} kVA · `:""}${x.phases?escapeHtml(x.phases):""}</div>`
+        : "";
+      return `<div class="list-card"><div class="row" style="justify-content:space-between;align-items:flex-start"><div><b>${escapeHtml(x.type||"ATIVO")}</b> — ${escapeHtml(x.number||"")}${extra}</div><button class="btn btn-danger" onclick="removeSubAsset(${i},${j})">Excluir</button></div></div>`;
+    }).join("");
     const mats=sp.materials.map((x,j)=>`<div class="list-card"><b>${escapeHtml(`${x.code||""}${x.code?" - ":""}${x.name||""}`)}</b> · ${x.qty||0} ${escapeHtml(x.unit||"")} <button class="btn btn-danger" onclick="removeSubMaterial(${i},${j})">Excluir</button></div>`).join("");
     const srvs=sp.services.map((x,j)=>`<div class="list-card"><b style="${x.training?"color:#15803d":""}">${escapeHtml(`${x.code||""}${x.code?" - ":""}${x.name||""}`)}</b> <button class="btn btn-danger" onclick="removeSubService(${i},${j})">Excluir</button></div>`).join("");
     const d=document.createElement("div");d.className="subpoint-card";d.innerHTML=`
@@ -1057,9 +1048,9 @@ function renderSubpoints(){
        <div><label>Estrutura *</label><select data-sub="${i}" data-k="structure">${structureOptions(sp.structure)}</select></div>
        <div><label>Quantidade de estrutura *</label><input data-sub="${i}" data-k="qty" type="number" min="1" value="${sp.qty||1}"></div>
       </div>
-      <div class="sub-section"><div class="sub-section-title">Ativos / Patrimônios</div>${assets||'<div class="muted">Nenhum ativo.</div>'}<button class="btn btn-secondary" onclick="openSubEditor('asset',${i})">+ Adicionar ativo</button>${assetEditorHTML(i)}</div>
-      <div class="sub-section"><div class="sub-section-title">Materiais Aplicados</div>${mats||'<div class="muted">Nenhum material.</div>'}<button class="btn btn-secondary" onclick="openSubEditor('material',${i})">+ Adicionar material</button>${materialEditorHTML(i)}</div>
-      <div class="sub-section"><div class="sub-section-title">Serviços Executados</div>${srvs||'<div class="muted">Nenhum serviço.</div>'}<button class="btn btn-secondary" onclick="openSubEditor('service',${i})">+ Adicionar serviço</button>${serviceEditorHTML(i)}</div>
+      <div class="sub-section"><div class="sub-section-title">Ativos / Patrimônios</div>${assets||'<div class="muted">Nenhum ativo.</div>'}<button class="btn btn-secondary" onclick="openSubEditor('asset',${i})">ADICIONAR ATIVO</button>${assetEditorHTML(i)}</div>
+      <div class="sub-section"><div class="sub-section-title">Materiais Aplicados</div>${mats||'<div class="muted">Nenhum material.</div>'}<button class="btn btn-secondary" onclick="openSubEditor('material',${i})">ADICIONAR MATERIAL</button>${materialEditorHTML(i)}</div>
+      <div class="sub-section"><div class="sub-section-title">Serviços Executados</div>${srvs||'<div class="muted">Nenhum serviço.</div>'}<button class="btn btn-secondary" onclick="openSubEditor('service',${i})">ADICIONAR SERVIÇO</button>${serviceEditorHTML(i)}</div>
       <div class="sub-section"><div class="sub-section-title">Fotos do Item — até 20</div><div class="row"><button class="btn btn-secondary" onclick="subPhotoCamera(${i})">📷 Tirar foto</button><button class="btn btn-outline" onclick="subPhotoGallery(${i})">🖼️ Galeria</button></div>${subPhotoHTML(sp,i)}<div class="muted">${sp.photos.filter(Boolean).length} de 20 fotos</div></div>`;
     subpointsList.appendChild(d);
   });
@@ -1281,26 +1272,41 @@ subPhotoInput.addEventListener("change",async e=>{const f=e.target.files?.[0];if
 subGalleryInput.addEventListener("change",async e=>{const sp=currentSubpoints[subPhotoTarget.sub];for(const f of [...(e.target.files||[])]){const k=[...Array(20).keys()].find(x=>!sp.photos[x]);if(k===undefined)break;const data=await compressImage(f,1600,.75);sp.photos[k]={id:uid("photo"),data,name:f.name,createdAt:nowISO()}}renderSubpoints();schedulePersist()});
 
 /* TRECHOS */
-function toggleIsolatedSegment(){
-  const iso=sIsolated.checked;
-  sFrom.disabled=iso;sTo.disabled=iso;
-  isolatedRefWrap.style.display=iso?"block":"none";
-  if(iso){sFrom.value="";sTo.value="";}
+function handleSegmentEndpointChange(){
+  const isolated=sFrom.value==="__ISOLATED__";
+  const toWrap=document.getElementById("sToWrap");
+  if(toWrap)toWrap.style.display=isolated?"none":"block";
+  isolatedRefWrap.style.display=isolated?"block":"none";
+  if(isolated)sTo.value="";
 }
-
+function toggleOtherSegmentService(){
+  sOtherServiceWrap.style.display=sService.value==="OUTRO"?"block":"none";
+  if(sService.value!=="OUTRO")sOtherService.value="";
+}
 function renderPointSelects(){
-  const opts=['<option value="">Selecione...</option>']
-    .concat(app.points.map(p=>`<option value="${p.id}">${p.code} — ${escapeHtml(p.structure||p.postSituation||"Ponto")}</option>`))
+  const pointOpts=app.points.map(p=>{
+    const item=normalizeSubpointsFromPoint(p)[0];
+    const desc=item?.structure||"Ponto";
+    return `<option value="${p.id}">${escapeHtml(p.code)} — ${escapeHtml(desc)}</option>`;
+  });
+  sFrom.innerHTML=['<option value="">Selecione...</option>']
+    .concat(pointOpts)
+    .concat(['<option value="__ISOLATED__">TRECHO ISOLADO</option>'])
     .join("");
-  sFrom.innerHTML=opts;sTo.innerHTML=opts;
+  sTo.innerHTML=['<option value="">Selecione...</option>'].concat(pointOpts).join("");
+  handleSegmentEndpointChange();
 }
 async function saveSegment(){
-  const isolated=sIsolated.checked;
+  const isolated=sFrom.value==="__ISOLATED__";
   if(isolated){
-    if(!sIsolatedRef.value.trim()){alert("Informe a referência do trecho / ponto isolado.");return;}
+    if(!sIsolatedRef.value.trim()){alert("Informe o TRECHO.");return;}
   }else if(!sFrom.value||!sTo.value||sFrom.value===sTo.value){
-    alert("Selecione dois pontos diferentes ou marque a opção de trecho/ponto isolado.");return;
+    alert("Selecione dois pontos diferentes ou escolha TRECHO ISOLADO.");return;
   }
+  if(sService.value==="OUTRO" && !sOtherService.value.trim()){
+    alert("Informe o Serviço / Intervenção.");return;
+  }
+  const service=sService.value==="OUTRO"?sOtherService.value.trim():sService.value;
   const seg={
     id:uid("seg"),
     createdAt:nowISO(),
@@ -1310,15 +1316,14 @@ async function saveSegment(){
     to:isolated?"":sTo.value,
     networkType:sNetworkType.value,
     cable:sCable.value,
-    lengthProject:parseFloat(sLengthProject.value)||0,
     lengthExecuted:parseFloat(sLengthExecuted.value)||0,
-    service:sService.value,
-    conformity:sConformity.value
+    service
   };
   await storePut("segments",seg);
   app.segments=(await storeGetAll("segments")).sort((a,b)=>(a.createdAt||"").localeCompare(b.createdAt||""));
   renderSegments();renderSummary();
-  sCable.value="";sLengthProject.value="";sLengthExecuted.value="";sIsolatedRef.value="";sIsolated.checked=false;toggleIsolatedSegment();
+  sFrom.value="";sTo.value="";sCable.value="";sLengthExecuted.value="";sIsolatedRef.value="";
+  sService.value="";sOtherService.value="";toggleOtherSegmentService();handleSegmentEndpointChange();
   setStatus(`Trecho salvo · Total: ${app.segments.length}`);
 }
 function renderSegments(){
@@ -1330,7 +1335,7 @@ function renderSegments(){
     const div=document.createElement("div");div.className="list-card";
     const title=s.isolated?`ISOLADO — ${escapeHtml(s.isolatedRef||"Sem referência")}`:`${a?.code||"?"} → ${b?.code||"?"}`;
     div.innerHTML=`<div class="title">${title}</div>
-      <div class="meta">${escapeHtml(s.networkType)} · ${escapeHtml(s.cable||"Sem condutor")} · Projeto: ${s.lengthProject||0} m · Executado: ${s.lengthExecuted||0} m</div>
+      <div class="meta">${escapeHtml(s.networkType)} · ${escapeHtml(s.cable||"Sem condutor")} · Executado: ${s.lengthExecuted||0} m · ${escapeHtml(s.service||"")}</div>
       <div class="point-actions no-print"><button class="btn btn-danger" onclick="deleteSegment('${s.id}')">Excluir</button></div>`;
     segmentsList.appendChild(div);
   });
@@ -1397,7 +1402,7 @@ function segmentSummaryCard(s){
   const a=app.points.find(p=>p.id===s.from),b=app.points.find(p=>p.id===s.to);
   const title=s.isolated?`TRECHO / PONTO ISOLADO — ${escapeHtml(s.isolatedRef||"Sem referência")}`:`${a?.code||"?"} → ${b?.code||"?"}`;
   return `<div class="title">${title}</div>
-    <div class="meta">${localDateTime(s.createdAt)} · ${escapeHtml(s.networkType)} · ${escapeHtml(s.cable||"Sem condutor")} · Projeto: ${s.lengthProject||0} m · Executado: ${s.lengthExecuted||0} m · ${escapeHtml(s.conformity||"")}</div>`;
+    <div class="meta">${localDateTime(s.createdAt)} · ${escapeHtml(s.networkType)} · ${escapeHtml(s.cable||"Sem condutor")} · Executado: ${s.lengthExecuted||0} m · ${escapeHtml(s.service||"")}</div>`;
 }
 function renderSummaryTimeline(){
   summaryTimeline.innerHTML="";
@@ -1491,7 +1496,7 @@ function renderSummarySegments(){
     const div=document.createElement("div");div.className="list-card";
     const title=s.isolated?`ISOLADO — ${escapeHtml(s.isolatedRef||"Sem referência")}`:`${a?.code||"?"} → ${b?.code||"?"}`;
     div.innerHTML=`<div class="title">${title}</div>
-      <div class="meta">${escapeHtml(s.networkType)} · ${escapeHtml(s.cable||"")} · ${s.lengthExecuted||s.lengthProject||0} m · ${escapeHtml(s.conformity)}</div>`;
+      <div class="meta">${escapeHtml(s.networkType)} · ${escapeHtml(s.cable||"")} · ${s.lengthExecuted||0} m · ${escapeHtml(s.service||"")}</div>`;
     summarySegments.appendChild(div);
   });
 }
