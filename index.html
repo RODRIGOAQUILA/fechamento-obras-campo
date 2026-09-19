@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <meta name="theme-color" content="#0f172a" />
-  <title>Equatorial - Fechamento de Obra v12.3</title>
+  <title>Equatorial - Fechamento de Obra v12.4</title>
 
   <!-- Leaflet (mapa). Os dados do formulário continuam salvos mesmo sem internet.
        Sem internet, apenas o mapa-base do OpenStreetMap pode não carregar. -->
@@ -525,13 +525,10 @@ async function persistHeader(){
   flashSaved();
 }
 async function persistDraft(){
-  const hasData=editingPointId || pLat.value || pLng.value || pProjectPoint.value || pCrewType.value || currentSubpoints.some(x=>x.action||x.structure) || currentServices.length || sSearch.value || currentMaterials.length || currentIdentifications.length;
-  if(hasData){
-    const draft=collectDraftPoint();
-    await storeSet("draft","current",draft);
-  }else{
-    await storeDelete("draft","current");
-  }
+  const lat=document.getElementById("pLat")?.value||"",lng=document.getElementById("pLng")?.value||"",proj=document.getElementById("pProjectPoint")?.value||"",crew=document.getElementById("pCrewType")?.value||"";
+  const hasItem=(currentSubpoints||[]).some(x=>x.action||x.structure||(x.assets||[]).length||(x.materials||[]).length||(x.services||[]).length||(x.photos||[]).filter(Boolean).length);
+  if(editingPointId||lat||lng||proj||crew||hasItem) await storeSet("draft","current",collectDraftPoint());
+  else await storeDelete("draft","current");
   flashSaved();
 }
 let autoTimer;
@@ -599,246 +596,15 @@ async function captureGPS(){
 
 function togglePostFields(){ schedulePersist(); }
 
-/* ATIVOS / PATRIMÔNIOS */
-function normalizeAssetType(type){
-  const t=(type||"").toUpperCase();
-  const map={
-    "Nº POSTE":"POSTE",
-    "Nº TRANSFORMADOR":"TRANSFORMADOR",
-    "Nº MEDIDOR":"MEDIDOR",
-    "OUTRO":"OUTRO ATIVO COM PATRIMÔNIO"
-  };
-  return map[t]||type||"POSTE";
-}
-function addIdentification(data={type:"POSTE",number:""}){
-  currentIdentifications.push({id:uid("asset"),type:normalizeAssetType(data.type),number:data.number||""});
-  renderIdentifications();
-  schedulePersist();
-}
-function renderIdentifications(){
-  identifications.innerHTML="";
-  if(!currentIdentifications.length){
-    identifications.innerHTML='<div class="empty">Nenhum ativo com patrimônio adicionado.</div>';
-    return;
-  }
-  const types=[
-    "POSTE","TRANSFORMADOR","MEDIDOR","CHAVE FUSÍVEL","CHAVE FACA / SECCIONADORA",
-    "RELIGADOR","REGULADOR DE TENSÃO","BANCO DE CAPACITORES","OUTRO ATIVO COM PATRIMÔNIO"
-  ];
-  currentIdentifications.forEach((it,idx)=>{
-    it.type=normalizeAssetType(it.type);
-    const options=types.map(t=>`<option ${it.type===t?"selected":""}>${escapeHtml(t)}</option>`).join("");
-    const row=document.createElement("div");
-    row.className="id-row";
-    row.innerHTML=`
-      <div><label>Tipo de Ativo</label>
-        <select data-i="${idx}" data-k="type">${options}</select>
-      </div>
-      <div><label>Nº Patrimônio / Identificação</label>
-        <input data-i="${idx}" data-k="number" value="${escapeHtml(it.number||"")}" placeholder="Digite a identificação do ativo">
-      </div>
-      <button class="icon-btn" title="Excluir" onclick="removeIdentification(${idx})">×</button>`;
-    identifications.appendChild(row);
-  });
-  identifications.querySelectorAll("input,select").forEach(el=>el.addEventListener("input",e=>{
-    const i=+e.target.dataset.i, k=e.target.dataset.k;
-    currentIdentifications[i][k]=e.target.value;
-    schedulePersist();
-  }));
-}
-function removeIdentification(i){
-  currentIdentifications.splice(i,1);renderIdentifications();schedulePersist();
-}
-
-/* MATERIAIS */
-function openMaterialAdder(){
-  materialAdder.style.display="block";
-  mSearch.value="";mSelected.value="";mQty.value=1;mUnit.value="UN";
-  renderSearchResults(mSearch,materialResults,MATERIALS,item=>selectMaterial(item),true);
-  mSearch.focus();
-}
-function closeMaterialAdder(){materialAdder.style.display="none";materialResults.style.display="none";}
-function selectMaterial(item){
-  mSelected.value=item.label;
-  mSearch.value=item.label;
-  mUnit.value=item.unit||"UN";
-  materialResults.style.display="none";
-}
-function confirmMaterial(){
-  const name=mSelected.value||mSearch.value.trim().toUpperCase();
-  const qty=parseFloat(mQty.value);
-  if(!name){alert("Selecione um material.");return}
-  if(!(qty>=0)){alert("Informe uma quantidade válida.");return}
-  currentMaterials.push({id:uid("mat"),name,qty,unit:mUnit.value});
-  renderMaterials();
-  closeMaterialAdder();
-  schedulePersist();
-}
-function renderMaterials(){
-  materials.innerHTML="";
-  if(!currentMaterials.length){
-    materials.innerHTML='<div class="empty">Nenhum material adicionado.</div>';
-    return;
-  }
-  currentMaterials.forEach((m,i)=>{
-    const known=MATERIALS.find(x=>x.label===m.name);
-    const div=document.createElement("div");
-    div.className="list-card";
-    div.innerHTML=`
-      <div class="row" style="justify-content:space-between">
-        <div>
-          <div class="title">${escapeHtml(m.name)} ${known?.usual?'<span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:#b91c1c;margin-left:7px;vertical-align:middle" title="Item destacado"></span>':''}</div>
-          <div class="meta">${m.qty} ${escapeHtml(m.unit)}</div>
-        </div>
-        <button class="btn btn-danger" onclick="removeMaterial(${i})">Excluir</button>
-      </div>`;
-    materials.appendChild(div);
-  });
-}
-function removeMaterial(i){currentMaterials.splice(i,1);renderMaterials();schedulePersist();}
-
-/* PESQUISA */
-function renderSearchResults(input,box,list,onSelect,groupUsual=false){
-  const q=(input.value||"").trim().toLocaleUpperCase("pt-BR");
-  const filtered=list
-    .filter(x=>(x.label||x.name||"").toLocaleUpperCase("pt-BR").includes(q))
-    .sort((a,b)=>(a.name||"").localeCompare((b.name||""),"pt-BR") || (a.code||"").localeCompare((b.code||""),"pt-BR"));
-  box.innerHTML="";
-  filtered.forEach(item=>box.appendChild(makeSearchItem(item,onSelect,item.usual)));
-  if(!box.children.length) box.innerHTML='<div class="search-item">Nenhum item encontrado.</div>';
-  box.style.display="block";
-}
-function makeSearchItem(item,onSelect,usual){
-  const div=document.createElement("div");
-  div.className="search-item"+(item.training?" training":(usual?" usual":""));
-  div.innerHTML=`<b>${escapeHtml(item.name||item.label)}</b>${item.code?`<small>${escapeHtml(item.code)} · ${escapeHtml(item.unit||"")}</small>`:""}`;
-  div.onclick=()=>onSelect(item);
-  return div;
-}
-mSearch.addEventListener("input",()=>renderSearchResults(mSearch,materialResults,MATERIALS,selectMaterial,true));
-mSearch.addEventListener("focus",()=>renderSearchResults(mSearch,materialResults,MATERIALS,selectMaterial,true));
-function serviceDisplay(item){
-  return `${item.code||""}${item.code?" - ":""}${item.name||item.label||""}`.trim();
-}
-function renderServiceResults(){
-  const q=(sSearch.value||"").trim().toLocaleUpperCase("pt-BR");
-  const filtered=SERVICES
-    .filter(x=>(`${x.code||""} ${x.name||""} ${x.label||""}`).toLocaleUpperCase("pt-BR").includes(q))
-    .sort((a,b)=>(a.name||"").localeCompare((b.name||""),"pt-BR") || (a.code||"").localeCompare((b.code||""),"pt-BR"));
-  serviceResults.innerHTML="";
-  filtered.forEach(item=>{
-    const div=document.createElement("div");
-    div.className="search-item"+(item.training?" training":(item.usual?" usual":""));
-    div.innerHTML=`<b>${escapeHtml(serviceDisplay(item))}</b>${item.unit?`<small>Unidade: ${escapeHtml(item.unit)}</small>`:""}`;
-    div.onclick=()=>selectServiceItem(item);
-    serviceResults.appendChild(div);
-  });
-  if(!serviceResults.children.length) serviceResults.innerHTML='<div class="search-item">Nenhum serviço encontrado.</div>';
-  serviceResults.style.display="block";
-}
-function selectServiceItem(item){
-  sSelected.value=item.code||item.label;
-  sSearch.value=serviceDisplay(item);
-  serviceResults.style.display="none";
-}
-function openServiceAdder(){
-  serviceAdder.style.display="block";
-  sSearch.value="";
-  sSelected.value="";
-  if(suggestedServiceCode){
-    const official=findServiceByCode(suggestedServiceCode);
-    if(official) selectServiceItem(official);
-  }
-  renderServiceResults();
-  sSearch.focus();
-}
-function closeServiceAdder(){
-  serviceAdder.style.display="none";
-  serviceResults.style.display="none";
-  sSearch.value="";
-  sSelected.value="";
-}
-function confirmService(){
-  const code=(sSelected.value||"").trim();
-  let item=code ? findServiceByCode(code) : null;
-  if(!item && sSearch.value.trim()){
-    const typed=sSearch.value.trim().toLocaleUpperCase("pt-BR");
-    item=SERVICES.find(x=>serviceDisplay(x).toLocaleUpperCase("pt-BR")===typed || (x.label||"").toLocaleUpperCase("pt-BR")===typed);
-  }
-  if(!item){
-    alert("Selecione um serviço da Lista Geral de Serviços.");
-    return;
-  }
-  const exists=currentServices.some(s=>String(s.code)===String(item.code) && (s.name||"")===(item.name||""));
-  if(exists){
-    alert("Este serviço já foi adicionado ao ponto.");
-    return;
-  }
-  currentServices.push({
-    id:uid("srv"),code:item.code||"",name:item.name||"",label:serviceDisplay(item),
-    unit:item.unit||"",training:!!item.training
-  });
-  renderServices();
-  closeServiceAdder();
-  schedulePersist();
-}
-function renderServices(){
-  servicesList.innerHTML="";
-  if(!currentServices.length){
-    servicesList.innerHTML='<div class="empty">Nenhum serviço adicionado.</div>';
-    return;
-  }
-  currentServices.forEach((s,i)=>{
-    const div=document.createElement("div");
-    div.className="list-card";
-    div.innerHTML=`
-      <div class="row" style="justify-content:space-between;align-items:flex-start">
-        <div>
-          <div class="title" style="${s.training?"color:#15803d;":""}">${escapeHtml(`${s.code}${s.code?" - ":""}${s.name||s.label||""}`)}</div>
-          ${s.unit?`<div class="meta">Unidade: ${escapeHtml(s.unit)}</div>`:""}
-        </div>
-        <button class="btn btn-danger" onclick="removeService(${i})">Excluir</button>
-      </div>`;
-    servicesList.appendChild(div);
-  });
-}
-function removeService(i){
-  currentServices.splice(i,1);renderServices();schedulePersist();
-}
+/* COMPATIBILIDADE COM REGISTROS ANTIGOS */
+function normalizeAssetType(type){ return (type||"ATIVO").toUpperCase(); }
 function servicesForPoint(p){
-  if(Array.isArray(p.services) && p.services.length){
-    return p.services.map(s=>({
-      id:s.id||uid("srv"),code:s.code||"",name:s.name||s.description||"",
-      label:s.label||`${s.code||""}${s.code?" - ":""}${s.name||s.description||""}`.trim(),
-      unit:s.unit||"",training:!!s.training
-    }));
-  }
-  if(p.service || p.serviceCode || p.serviceDescription){
-    const official=findServiceByCode(p.serviceCode);
-    return [{
-      id:uid("srv"),code:p.serviceCode||official?.code||"",
-      name:p.serviceDescription||official?.name||p.service||"",
-      label:p.service||official?.label||`${p.serviceCode||""}${p.serviceCode?" - ":""}${p.serviceDescription||""}`.trim(),
-      unit:official?.unit||"",training:!!official?.training
-    }];
+  if(Array.isArray(p?.services) && p.services.length) return JSON.parse(JSON.stringify(p.services));
+  if(p?.serviceCode || p?.serviceDescription || p?.service){
+    return [{id:uid("srv"),code:p.serviceCode||"",name:p.serviceDescription||p.service||"",label:p.service||p.serviceDescription||"",unit:"",training:false}];
   }
   return [];
 }
-sSearch.addEventListener("input",()=>{sSelected.value="";renderServiceResults();});
-sSearch.addEventListener("focus",renderServiceResults);
-document.addEventListener("click",e=>{
-  if(!e.target.closest(".search-dropdown")){
-    document.querySelectorAll(".search-results").forEach(x=>x.style.display="none");
-  }
-});
-
-function normalizeAction(value){ return (value||"").trim().toUpperCase(); }
-
-function findServiceByCode(code){
-  return SERVICES.find(x=>String(x.code||"").trim()===String(code||"").trim());
-}
-
-function applyMeasurementRule(){ /* filtros independentes: sem autopreenchimento */ schedulePersist(); }
 
 /* ITEMS / ESTRUTURAS DO PONTO */
 function structureOptions(selected=""){
@@ -886,7 +652,7 @@ function ensureSubpoint(sp={}){
     services:Array.isArray(sp.services)?sp.services:[],photos:Array.isArray(sp.photos)?sp.photos.slice(0,20):[]};
 }
 
-let subEditor={type:null,index:null};
+var subEditor={type:null,index:null};
 
 const ASSET_TYPES=[
   "POSTE","TRANSFORMADOR","MEDIDOR","CHAVE FUSÍVEL","CHAVE FACA / SECCIONADORA",
@@ -1155,31 +921,17 @@ function nextPointNumber(){
 function pointCode(n){return "P"+String(n).padStart(3,"0");}
 
 function collectDraftPoint(){
+  const old=editingPointId?app.points.find(p=>p.id===editingPointId):null;
   return {
     id:editingPointId||uid("point"),
-    code:editingPointId?(app.points.find(p=>p.id===editingPointId)?.code||pointCode(nextPointNumber())):pointCode(nextPointNumber()),
-    createdAt: editingPointId?(app.points.find(p=>p.id===editingPointId)?.createdAt||nowISO()):nowISO(),
-    updatedAt:nowISO(),
-    lat:parseFloat(pLat.value)||null,
-    lng:parseFloat(pLng.value)||null,
-    projectPoint:pProjectPoint.value.trim(),
-    crewType:pCrewType.value,
-    subpoints:JSON.parse(JSON.stringify(currentSubpoints)),
-    postSituation:currentSubpoints[0]?.action||"",
-    action:currentSubpoints[0]?.action||"",
-    structure:currentSubpoints[0]?.structure||"",
-    structureQty:currentSubpoints[0]?.qty||0,
-    services:JSON.parse(JSON.stringify(currentServices)),
-    service:currentServices[0]?.label||"",
-    serviceCode:currentServices[0]?.code||"",
-    serviceDescription:currentServices[0]?.name||"",
-    identifications:JSON.parse(JSON.stringify(currentIdentifications)),
-    materials:JSON.parse(JSON.stringify(currentMaterials)),
-    conformity:currentConformity,
-    adjustReason:pAdjustReason.value.trim(),
-    changed:pChanged.value.trim(),
-    notes:pNotes.value.trim(),
-    photos:currentPhotos.filter(Boolean)
+    code:old?.code||pointCode(nextPointNumber()),
+    createdAt:old?.createdAt||nowISO(), updatedAt:nowISO(),
+    lat:parseFloat(document.getElementById("pLat")?.value)||null,
+    lng:parseFloat(document.getElementById("pLng")?.value)||null,
+    projectPoint:(document.getElementById("pProjectPoint")?.value||"").trim(),
+    crewType:document.getElementById("pCrewType")?.value||"",
+    subpoints:JSON.parse(JSON.stringify((currentSubpoints||[]).map(ensureSubpoint))),
+    notes:(document.getElementById("pNotes")?.value||"").trim()
   };
 }
 
@@ -1196,10 +948,6 @@ async function savePoint(){
     if(!(Number(sp.qty)>0)){alert(`Informe a Quantidade de Estrutura do Item ${i+1}.`);return}
   }
   for(let i=0;i<p.subpoints.length;i++){if(!p.subpoints[i].services?.length){alert(`Adicione pelo menos um Serviço no Item ${i+1}.`);return}}
-  if(!p.conformity){alert("Informe se o ponto está conforme ou com ajuste ao projeto.");return}
-  if(p.conformity==="AJUSTE" && (!p.adjustReason || !p.changed)){
-    alert("Informe o motivo do ajuste e o que foi alterado.");return;
-  }
 
   await storePut("points",p);
   await storeDelete("draft","current");
@@ -1216,33 +964,25 @@ async function savePoint(){
 
 function newPoint(clearDraft=true){
   editingPointId=null;
-  currentPhotos=new Array(20).fill(null);currentMaterials=[];currentIdentifications=[];currentServices=[];currentSubpoints=[ensureSubpoint()];currentConformity="";suggestedServiceCode="";
-  pLat.value="";pLng.value="";pProjectPoint.value="";pCrewType.value="";
-  sSearch.value="";sSelected.value="";serviceAdder.style.display="none";
-  pAdjustReason.value="";pChanged.value="";pNotes.value="";
-  togglePostFields();setConformity("");
+  currentSubpoints=[ensureSubpoint()];
+  currentMaterials=[];currentIdentifications=[];currentServices=[];currentPhotos=[];
+  const lat=document.getElementById("pLat"),lng=document.getElementById("pLng"),proj=document.getElementById("pProjectPoint"),crew=document.getElementById("pCrewType"),notes=document.getElementById("pNotes");
+  if(lat)lat.value="";if(lng)lng.value="";if(proj)proj.value="";if(crew)crew.value="";if(notes)notes.value="";
   renderSubpoints();
-  pointTitle.textContent="Novo Ponto";
-  pointCodeBadge.textContent=pointCode(nextPointNumber());
-  pointCodeBadge.className="badge badge-gray";
+  const title=document.getElementById("pointTitle"),badge=document.getElementById("pointCodeBadge");
+  if(title)title.textContent="Novo Ponto";if(badge){badge.textContent=pointCode(nextPointNumber());badge.className="badge badge-gray";}
   app.currentPoint=null;
   if(clearDraft && db) storeDelete("draft","current").catch(()=>{});
 }
 function editPoint(id){
   const p=app.points.find(x=>x.id===id);if(!p)return;
   editingPointId=id;
-  pLat.value=p.lat||"";pLng.value=p.lng||"";pProjectPoint.value=p.projectPoint||"";pCrewType.value=p.crewType||"";
+  document.getElementById("pLat").value=p.lat||"";document.getElementById("pLng").value=p.lng||"";
+  document.getElementById("pProjectPoint").value=p.projectPoint||"";document.getElementById("pCrewType").value=p.crewType||"";
+  document.getElementById("pNotes").value=p.notes||"";
   currentSubpoints=normalizeSubpointsFromPoint(p);
-  currentServices=servicesForPoint(p);
-  currentIdentifications=JSON.parse(JSON.stringify(p.identifications||[])).map(x=>({...x,type:normalizeAssetType(x.type)}));
-  currentMaterials=JSON.parse(JSON.stringify(p.materials||[]));
-  currentPhotos=[];
-  currentConformity=p.conformity||"";
-  pAdjustReason.value=p.adjustReason||"";pChanged.value=p.changed||"";pNotes.value=p.notes||"";
-  renderSubpoints();togglePostFields();setConformity(currentConformity);
-  pointTitle.textContent="Editar "+p.code;
-  pointCodeBadge.textContent=p.code;
-  pointCodeBadge.className="badge badge-yellow";
+  renderSubpoints();
+  pointTitle.textContent="Editar "+p.code;pointCodeBadge.textContent=p.code;pointCodeBadge.className="badge badge-yellow";
   switchPanel("formPanel");window.scrollTo({top:0,behavior:"smooth"});
 }
 async function deletePoint(id){
@@ -1566,19 +1306,15 @@ function renderAssetSummary(){
 /* RASCUNHO AUTOMÁTICO */
 function loadDraft(p){
   if(!p)return;
-  editingPointId = app.points.some(x=>x.id===p.id)?p.id:null;
-  pLat.value=p.lat||"";pLng.value=p.lng||"";pProjectPoint.value=p.projectPoint||"";pCrewType.value=p.crewType||"";
-  currentSubpoints=normalizeSubpointsFromPoint(p);
-  currentServices=servicesForPoint(p);
-  currentIdentifications=JSON.parse(JSON.stringify(p.identifications||[])).map(x=>({...x,type:normalizeAssetType(x.type)}));
-  currentMaterials=JSON.parse(JSON.stringify(p.materials||[]));
-  currentPhotos=[];
-  currentConformity=p.conformity||"";
-  pAdjustReason.value=p.adjustReason||"";pChanged.value=p.changed||"";pNotes.value=p.notes||"";
-  renderSubpoints();togglePostFields();setConformity(currentConformity);
+  editingPointId=p.id&&app.points.some(x=>x.id===p.id)?p.id:null;
+  document.getElementById("pLat").value=p.lat||"";document.getElementById("pLng").value=p.lng||"";
+  document.getElementById("pProjectPoint").value=p.projectPoint||"";document.getElementById("pCrewType").value=p.crewType||"";
+  document.getElementById("pNotes").value=p.notes||"";
+  currentSubpoints=normalizeSubpointsFromPoint(p);renderSubpoints();
   pointTitle.textContent=editingPointId?"Editar "+p.code:"Ponto em andamento";
   pointCodeBadge.textContent=p.code||pointCode(nextPointNumber());
 }
+
 
 
 async function clearWork(){
@@ -1656,13 +1392,7 @@ window.addEventListener("beforeunload",()=>{
   setStatus(`Salvo · ${app.points.length} ponto(s) · ${app.segments.length} trecho(s)`);
 })();
 
-document.addEventListener("DOMContentLoaded",()=>{
-  try{
-    if(!Array.isArray(currentSubpoints)) currentSubpoints=[];
-    if(!currentSubpoints.length) currentSubpoints.push(ensureSubpoint());
-    renderSubpoints();
-  }catch(e){console.error("Inicialização dos itens:",e);}
-});
+
 
 </script>
 <input id="subPhotoInput" type="file" accept="image/*" capture="environment" style="display:none"><input id="subGalleryInput" type="file" accept="image/*" multiple style="display:none"></body>
