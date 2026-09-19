@@ -116,6 +116,8 @@
     .sub-photo-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:7px;margin-top:8px}
     .sub-photo-slot{position:relative;aspect-ratio:1;border:1px dashed #94a3b8;border-radius:9px;overflow:hidden;background:#fff;display:flex;align-items:center;justify-content:center;text-align:center;font-size:11px;color:#64748b}
     .sub-photo-slot img{width:100%;height:100%;object-fit:cover}.sub-photo-slot .remove{position:absolute;right:2px;top:2px;border:0;border-radius:50%;width:24px;height:24px;background:#b91c1c;color:white}
+    .sub-inline-editor{margin-top:9px;padding:10px;border:1px solid #dbe3ef;border-radius:10px;background:#fff}
+    .sub-inline-editor .search-results{max-height:220px}
     .sub-section{margin-top:12px;padding-top:10px;border-top:1px dashed #cbd5e1}.sub-section-title{font-weight:800;margin-bottom:7px}
     @media(max-width:700px){.sub-photo-grid{grid-template-columns:repeat(4,1fr)}}
     .subpoint-card{border:1px solid #cbd5e1;border-radius:14px;padding:14px;margin:10px 0;background:#f8fafc}
@@ -258,10 +260,10 @@
 
       <div class="divider"></div>
 
-      <h3>Estruturas / Subpontos do Ponto</h3>
-      <div class="muted">Cadastre uma ou mais ações/estruturas dentro da mesma coordenada. Os campos são independentes e não possuem autopreenchimento.</div>
+      <h3>Estruturas / Items do Ponto</h3>
+      
       <div id="subpointsList"></div>
-      <button class="btn btn-secondary" onclick="addSubpoint()">+ Adicionar outro subponto</button>
+      <button class="btn btn-secondary" onclick="addSubpoint()">+ Adicionar outro item</button>
 
       <div class="divider"></div>
 
@@ -887,7 +889,7 @@ function findServiceByCode(code){
 
 function applyMeasurementRule(){ /* filtros independentes: sem autopreenchimento */ schedulePersist(); }
 
-/* SUBPONTOS / ESTRUTURAS DO PONTO */
+/* ITEMS / ESTRUTURAS DO PONTO */
 const STRUCTURE_OPTIONS = [
   ["PROJETO / LEGADO",["S1","S1I"]],
   ["CONVENCIONAIS COM CRUZETA",["N1","B1","M1","T1","N2","B2","M2","T2","N3","B3","M3","T3","N4","B4","M4","TE","T4"]],
@@ -907,7 +909,7 @@ function structureOptions(selected=""){
 }
 function addSubpoint(data={}){currentSubpoints.push(ensureSubpoint(data));renderSubpoints();schedulePersist();}
 function removeSubpoint(i){
-  if(currentSubpoints.length<=1){alert("O ponto deve possuir pelo menos um subponto.");return;}
+  if(currentSubpoints.length<=1){alert("O ponto deve possuir pelo menos um item.");return;}
   currentSubpoints.splice(i,1);renderSubpoints();schedulePersist();
 }
 
@@ -916,29 +918,119 @@ function ensureSubpoint(sp={}){
     assets:Array.isArray(sp.assets)?sp.assets:[],materials:Array.isArray(sp.materials)?sp.materials:[],
     services:Array.isArray(sp.services)?sp.services:[],photos:Array.isArray(sp.photos)?sp.photos.slice(0,20):[]};
 }
-function addSubAsset(i){
-  const tipo=prompt("Tipo do ativo:","POSTE");if(!tipo)return;
-  const numero=prompt("Nº Patrimônio / Identificação:","");if(numero===null)return;
-  currentSubpoints[i].assets.push({id:uid("asset"),type:tipo.trim().toUpperCase(),number:numero.trim()});renderSubpoints();schedulePersist();
+
+let subEditor={type:null,index:null};
+
+const ASSET_TYPES=[
+  "POSTE","TRANSFORMADOR","MEDIDOR","CHAVE FUSÍVEL","CHAVE FACA / SECCIONADORA",
+  "RELIGADOR","REGULADOR DE TENSÃO","BANCO DE CAPACITORES","OUTRO ATIVO COM PATRIMÔNIO"
+];
+
+function openSubEditor(type,i){
+  subEditor={type,index:i};renderSubpoints();
+  setTimeout(()=>{
+    const el=document.getElementById(`editor-${type}-${i}`);
+    if(el)el.scrollIntoView({behavior:"smooth",block:"nearest"});
+    const inp=document.getElementById(type==="asset"?`asset-number-${i}`:`${type}-search-${i}`);
+    if(inp)inp.focus();
+  },30);
+}
+function closeSubEditor(){subEditor={type:null,index:null};renderSubpoints();}
+
+function assetEditorHTML(i){
+  if(subEditor.type!=="asset"||subEditor.index!==i)return "";
+  return `<div id="editor-asset-${i}" class="sub-inline-editor">
+    <div class="grid grid-2">
+      <div><label>Tipo de Ativo</label><select id="asset-type-${i}">${ASSET_TYPES.map(x=>`<option>${escapeHtml(x)}</option>`).join("")}</select></div>
+      <div><label>Nº Patrimônio / Identificação</label><input id="asset-number-${i}" placeholder="Digite o número do ativo"></div>
+    </div>
+    <div class="row" style="margin-top:8px"><button class="btn btn-primary" onclick="confirmSubAsset(${i})">Adicionar ativo</button><button class="btn btn-secondary" onclick="closeSubEditor()">Cancelar</button></div>
+  </div>`;
+}
+function confirmSubAsset(i){
+  const type=document.getElementById(`asset-type-${i}`).value;
+  const number=document.getElementById(`asset-number-${i}`).value.trim();
+  if(!number){alert("Informe o Nº Patrimônio / Identificação.");return}
+  currentSubpoints[i].assets.push({id:uid("asset"),type,number});
+  subEditor={type:null,index:null};renderSubpoints();schedulePersist();
 }
 function removeSubAsset(i,j){currentSubpoints[i].assets.splice(j,1);renderSubpoints();schedulePersist();}
-function addSubMaterial(i){
-  const q=prompt("Digite parte do código ou descrição do material:","");if(!q)return;
-  const z=q.toUpperCase();const a=MATERIALS.filter(x=>(`${x.code||""} ${x.name||""} ${x.label||""}`).toUpperCase().includes(z)).slice(0,10);
-  if(!a.length){alert("Material não encontrado.");return}
-  const n=parseInt(prompt(a.map((x,k)=>`${k+1}. ${x.code||""} - ${x.name||x.label||""}`).join("\n"),"1"))-1;if(!a[n])return;
-  const x=a[n],qty=parseFloat((prompt(`Quantidade (${x.unit||"un"}):`,"1")||"0").replace(",","."));if(!(qty>0))return;
-  currentSubpoints[i].materials.push({id:uid("mat"),code:x.code||"",name:x.name||x.label||"",unit:x.unit||"",qty});renderSubpoints();schedulePersist();
+
+function materialEditorHTML(i){
+  if(subEditor.type!=="material"||subEditor.index!==i)return "";
+  return `<div id="editor-material-${i}" class="sub-inline-editor">
+    <label>Material</label>
+    <div class="search-dropdown">
+      <input id="material-search-${i}" placeholder="🔎 Pesquisar por código ou descrição..." autocomplete="off" oninput="renderSubMaterialResults(${i})" onfocus="renderSubMaterialResults(${i})">
+      <div id="material-results-${i}" class="search-results"></div>
+      <input id="material-selected-${i}" type="hidden">
+    </div>
+    <div class="grid grid-2" style="margin-top:8px">
+      <div><label>Quantidade</label><input id="material-qty-${i}" type="number" min="0.01" step="0.01" value="1"></div>
+      <div><label>Unidade</label><input id="material-unit-${i}" readonly placeholder="Automático"></div>
+    </div>
+    <div class="row" style="margin-top:8px"><button class="btn btn-primary" onclick="confirmSubMaterial(${i})">Adicionar material</button><button class="btn btn-secondary" onclick="closeSubEditor()">Cancelar</button></div>
+  </div>`;
+}
+function renderSubMaterialResults(i){
+  const input=document.getElementById(`material-search-${i}`), box=document.getElementById(`material-results-${i}`);
+  if(!input||!box)return;
+  const q=input.value.trim().toLocaleUpperCase("pt-BR");
+  const list=MATERIALS.filter(x=>(`${x.code||""} ${x.name||""} ${x.label||""}`).toLocaleUpperCase("pt-BR").includes(q)).slice(0,80);
+  box.innerHTML=list.length?list.map((x,n)=>`<div class="search-item${x.usual?" usual":""}" onclick="selectSubMaterial(${i},${n})"><b>${escapeHtml(`${x.code||""}${x.code?" - ":""}${x.name||x.label||""}`)}</b>${x.unit?`<small>Unidade: ${escapeHtml(x.unit)}</small>`:""}</div>`).join(""):'<div class="search-item">Nenhum material encontrado.</div>';
+  box.dataset.items=JSON.stringify(list.map(x=>({code:x.code||"",name:x.name||x.label||"",label:x.label||"",unit:x.unit||"",usual:!!x.usual})));
+  box.style.display="block";
+}
+function selectSubMaterial(i,n){
+  const box=document.getElementById(`material-results-${i}`),items=JSON.parse(box.dataset.items||"[]"),x=items[n];if(!x)return;
+  document.getElementById(`material-selected-${i}`).value=JSON.stringify(x);
+  document.getElementById(`material-search-${i}`).value=`${x.code}${x.code?" - ":""}${x.name}`;
+  document.getElementById(`material-unit-${i}`).value=x.unit||"";
+  box.style.display="none";
+}
+function confirmSubMaterial(i){
+  const raw=document.getElementById(`material-selected-${i}`).value;if(!raw){alert("Selecione um material da lista.");return}
+  const x=JSON.parse(raw),qty=parseFloat(document.getElementById(`material-qty-${i}`).value);
+  if(!(qty>0)){alert("Informe a quantidade.");return}
+  currentSubpoints[i].materials.push({id:uid("mat"),code:x.code,name:x.name,label:x.label,unit:x.unit,qty});
+  subEditor={type:null,index:null};renderSubpoints();schedulePersist();
 }
 function removeSubMaterial(i,j){currentSubpoints[i].materials.splice(j,1);renderSubpoints();schedulePersist();}
-function addSubService(i){
-  const q=prompt("Digite parte do código ou descrição do serviço:","");if(!q)return;
-  const z=q.toUpperCase();const a=SERVICES.filter(x=>(`${x.code||""} ${x.name||""} ${x.label||""}`).toUpperCase().includes(z)).slice(0,10);
-  if(!a.length){alert("Serviço não encontrado.");return}
-  const n=parseInt(prompt(a.map((x,k)=>`${k+1}. ${x.code||""} - ${x.name||x.label||""}`).join("\n"),"1"))-1;if(!a[n])return;
-  const x=a[n];currentSubpoints[i].services.push({id:uid("srv"),code:x.code||"",name:x.name||x.label||"",unit:x.unit||"",training:!!x.training});renderSubpoints();schedulePersist();
+
+function serviceEditorHTML(i){
+  if(subEditor.type!=="service"||subEditor.index!==i)return "";
+  return `<div id="editor-service-${i}" class="sub-inline-editor">
+    <label>Serviço</label>
+    <div class="search-dropdown">
+      <input id="service-search-${i}" placeholder="🔎 Pesquisar por código ou descrição..." autocomplete="off" oninput="renderSubServiceResults(${i})" onfocus="renderSubServiceResults(${i})">
+      <div id="service-results-${i}" class="search-results"></div>
+      <input id="service-selected-${i}" type="hidden">
+    </div>
+    <div class="row" style="margin-top:8px"><button class="btn btn-primary" onclick="confirmSubService(${i})">Adicionar serviço</button><button class="btn btn-secondary" onclick="closeSubEditor()">Cancelar</button></div>
+  </div>`;
+}
+function renderSubServiceResults(i){
+  const input=document.getElementById(`service-search-${i}`),box=document.getElementById(`service-results-${i}`);if(!input||!box)return;
+  const q=input.value.trim().toLocaleUpperCase("pt-BR");
+  const list=SERVICES.filter(x=>(`${x.code||""} ${x.name||""} ${x.label||""}`).toLocaleUpperCase("pt-BR").includes(q)).slice(0,80);
+  box.innerHTML=list.length?list.map((x,n)=>`<div class="search-item${x.training?" training":(x.usual?" usual":"")}" onclick="selectSubService(${i},${n})"><b>${escapeHtml(`${x.code||""}${x.code?" - ":""}${x.name||x.label||""}`)}</b>${x.unit?`<small>Unidade: ${escapeHtml(x.unit)}</small>`:""}</div>`).join(""):'<div class="search-item">Nenhum serviço encontrado.</div>';
+  box.dataset.items=JSON.stringify(list.map(x=>({code:x.code||"",name:x.name||x.label||"",label:x.label||"",unit:x.unit||"",training:!!x.training,usual:!!x.usual})));
+  box.style.display="block";
+}
+function selectSubService(i,n){
+  const box=document.getElementById(`service-results-${i}`),items=JSON.parse(box.dataset.items||"[]"),x=items[n];if(!x)return;
+  document.getElementById(`service-selected-${i}`).value=JSON.stringify(x);
+  document.getElementById(`service-search-${i}`).value=`${x.code}${x.code?" - ":""}${x.name}`;
+  box.style.display="none";
+}
+function confirmSubService(i){
+  const raw=document.getElementById(`service-selected-${i}`).value;if(!raw){alert("Selecione um serviço da Lista Geral.");return}
+  const x=JSON.parse(raw);
+  currentSubpoints[i].services.push({id:uid("srv"),code:x.code,name:x.name,label:x.label,unit:x.unit,training:x.training,usual:x.usual});
+  subEditor={type:null,index:null};renderSubpoints();schedulePersist();
 }
 function removeSubService(i,j){currentSubpoints[i].services.splice(j,1);renderSubpoints();schedulePersist();}
+
 let subPhotoTarget={sub:0,slot:0};
 function subPhotoCamera(i,k=null){const sp=currentSubpoints[i];if(k===null)k=[...Array(20).keys()].find(x=>!sp.photos[x]);if(k===undefined){alert("Limite de 20 fotos.");return}subPhotoTarget={sub:i,slot:k};subPhotoInput.value="";subPhotoInput.click()}
 function subPhotoGallery(i){subPhotoTarget={sub:i,slot:null};subGalleryInput.value="";subGalleryInput.click()}
@@ -952,17 +1044,23 @@ function renderSubpoints(){
     const mats=sp.materials.map((x,j)=>`<div class="list-card"><b>${escapeHtml(`${x.code||""}${x.code?" - ":""}${x.name||""}`)}</b> · ${x.qty||0} ${escapeHtml(x.unit||"")} <button class="btn btn-danger" onclick="removeSubMaterial(${i},${j})">Excluir</button></div>`).join("");
     const srvs=sp.services.map((x,j)=>`<div class="list-card"><b style="${x.training?"color:#15803d":""}">${escapeHtml(`${x.code||""}${x.code?" - ":""}${x.name||""}`)}</b> <button class="btn btn-danger" onclick="removeSubService(${i},${j})">Excluir</button></div>`).join("");
     const d=document.createElement("div");d.className="subpoint-card";d.innerHTML=`
-      <div class="subpoint-head"><b>SUBPONTO ${i+1}</b>${i?`<button class="btn btn-danger" onclick="removeSubpoint(${i})">Excluir subponto</button>`:""}</div>
+      <div class="subpoint-head"><b>ITEM ${i+1}</b>${i?`<button class="btn btn-danger" onclick="removeSubpoint(${i})">Excluir item</button>`:""}</div>
       <div class="subpoint-grid">
-       <div><label>Ação *</label><select data-sub="${i}" data-k="action"><option value="">Selecione...</option>${["INSTALAR","RETIRAR","TRANSFORMAR","REALOCAR","MANTER","MODIFICAR","TENSIONAR","OUTRO"].map(x=>`<option ${sp.action===x?"selected":""}>${x}</option>`).join("")}</select></div>
+       <div>
+         <label>Ação *</label>
+         <select data-sub="${i}" data-k="action"><option value="">Selecione...</option>${["INSTALAR","RETIRAR","TRANSFORMAR","REALOCAR","MANTER","MODIFICAR","TENSIONAR","OUTRO"].map(x=>`<option ${sp.action===x?"selected":""}>${x}</option>`).join("")}</select>
+         <div style="margin-top:8px;${sp.action==="OUTRO"?"":"display:none"}">
+           <label>Informe a ação *</label>
+           <input data-sub="${i}" data-k="otherAction" value="${escapeHtml(sp.otherAction||"")}" placeholder="Digite a ação">
+         </div>
+       </div>
        <div><label>Estrutura *</label><select data-sub="${i}" data-k="structure">${structureOptions(sp.structure)}</select></div>
        <div><label>Quantidade de estrutura *</label><input data-sub="${i}" data-k="qty" type="number" min="1" value="${sp.qty||1}"></div>
-       <div style="${sp.action==="OUTRO"?"":"display:none"}"><label>Outra ação *</label><input data-sub="${i}" data-k="otherAction" value="${escapeHtml(sp.otherAction||"")}" placeholder="Digite a ação"></div>
       </div>
-      <div class="sub-section"><div class="sub-section-title">Ativos / Patrimônios</div>${assets||'<div class="muted">Nenhum ativo.</div>'}<button class="btn btn-secondary" onclick="addSubAsset(${i})">+ Adicionar ativo</button></div>
-      <div class="sub-section"><div class="sub-section-title">Materiais Aplicados</div>${mats||'<div class="muted">Nenhum material.</div>'}<button class="btn btn-secondary" onclick="addSubMaterial(${i})">+ Adicionar material</button></div>
-      <div class="sub-section"><div class="sub-section-title">Serviços Executados</div>${srvs||'<div class="muted">Nenhum serviço.</div>'}<button class="btn btn-secondary" onclick="addSubService(${i})">+ Adicionar serviço</button></div>
-      <div class="sub-section"><div class="sub-section-title">Fotos do Subponto — até 20</div><div class="row"><button class="btn btn-secondary" onclick="subPhotoCamera(${i})">📷 Tirar foto</button><button class="btn btn-outline" onclick="subPhotoGallery(${i})">🖼️ Galeria</button></div>${subPhotoHTML(sp,i)}<div class="muted">${sp.photos.filter(Boolean).length} de 20 fotos</div></div>`;
+      <div class="sub-section"><div class="sub-section-title">Ativos / Patrimônios</div>${assets||'<div class="muted">Nenhum ativo.</div>'}<button class="btn btn-secondary" onclick="openSubEditor('asset',${i})">+ Adicionar ativo</button>${assetEditorHTML(i)}</div>
+      <div class="sub-section"><div class="sub-section-title">Materiais Aplicados</div>${mats||'<div class="muted">Nenhum material.</div>'}<button class="btn btn-secondary" onclick="openSubEditor('material',${i})">+ Adicionar material</button>${materialEditorHTML(i)}</div>
+      <div class="sub-section"><div class="sub-section-title">Serviços Executados</div>${srvs||'<div class="muted">Nenhum serviço.</div>'}<button class="btn btn-secondary" onclick="openSubEditor('service',${i})">+ Adicionar serviço</button>${serviceEditorHTML(i)}</div>
+      <div class="sub-section"><div class="sub-section-title">Fotos do Item — até 20</div><div class="row"><button class="btn btn-secondary" onclick="subPhotoCamera(${i})">📷 Tirar foto</button><button class="btn btn-outline" onclick="subPhotoGallery(${i})">🖼️ Galeria</button></div>${subPhotoHTML(sp,i)}<div class="muted">${sp.photos.filter(Boolean).length} de 20 fotos</div></div>`;
     subpointsList.appendChild(d);
   });
   subpointsList.querySelectorAll("[data-sub]").forEach(el=>el.addEventListener(el.tagName==="SELECT"?"change":"input",e=>{const i=+e.target.dataset.sub,k=e.target.dataset.k;currentSubpoints[i][k]=k==="qty"?(parseInt(e.target.value)||0):e.target.value;if(k==="action")renderSubpoints();schedulePersist()}));
@@ -1077,15 +1175,15 @@ async function savePoint(){
   const p=collectDraftPoint();
   if(!p.lat || !p.lng){alert("Capture a coordenada do ponto.");return}
   if(!p.crewType){alert("Informe primeiro o Tipo de Turma: LM ou LV.");return}
-  if(!p.subpoints?.length){alert("Adicione pelo menos um subponto.");return}
+  if(!p.subpoints?.length){alert("Adicione pelo menos um item.");return}
   for(let i=0;i<p.subpoints.length;i++){
     const sp=p.subpoints[i];
-    if(!sp.action){alert(`Informe a Ação do Subponto ${i+1}.`);return}
-    if(sp.action==="OUTRO" && !(sp.otherAction||"").trim()){alert(`Informe a Outra Ação do Subponto ${i+1}.`);return}
-    if(!sp.structure){alert(`Informe a Estrutura do Subponto ${i+1}.`);return}
-    if(!(Number(sp.qty)>0)){alert(`Informe a Quantidade de Estrutura do Subponto ${i+1}.`);return}
+    if(!sp.action){alert(`Informe a Ação do Item ${i+1}.`);return}
+    if(sp.action==="OUTRO" && !(sp.otherAction||"").trim()){alert(`Informe a Outra Ação do Item ${i+1}.`);return}
+    if(!sp.structure){alert(`Informe a Estrutura do Item ${i+1}.`);return}
+    if(!(Number(sp.qty)>0)){alert(`Informe a Quantidade de Estrutura do Item ${i+1}.`);return}
   }
-  for(let i=0;i<p.subpoints.length;i++){if(!p.subpoints[i].services?.length){alert(`Adicione pelo menos um Serviço no Subponto ${i+1}.`);return}}
+  for(let i=0;i<p.subpoints.length;i++){if(!p.subpoints[i].services?.length){alert(`Adicione pelo menos um Serviço no Item ${i+1}.`);return}}
   if(!p.conformity){alert("Informe se o ponto está conforme ou com ajuste ao projeto.");return}
   if(p.conformity==="AJUSTE" && (!p.adjustReason || !p.changed)){
     alert("Informe o motivo do ajuste e o que foi alterado.");return;
@@ -1278,7 +1376,7 @@ function pointSummaryCard(p){
   const srvs=servicesForPoint(p).map(s=>`<li>${escapeHtml(`${s.code}${s.code?" - ":""}${s.name||s.label||""}`)}</li>`).join("");
   const subs=normalizeSubpointsFromPoint(p).map((sp,i)=>{
     const act=sp.action==="OUTRO"?(sp.otherAction||"OUTRO"):sp.action;
-    return `<li><b>Subponto ${i+1}:</b> ${escapeHtml(act||"—")} · ${escapeHtml(sp.structure||"—")} · Qtd ${sp.qty||0}</li>`;
+    return `<li><b>Item ${i+1}:</b> ${escapeHtml(act||"—")} · ${escapeHtml(sp.structure||"—")} · Qtd ${sp.qty||0}</li>`;
   }).join("");
   const photos=(p.photos||[]).length;
   return `<div class="row" style="justify-content:space-between;align-items:flex-start">
@@ -1288,7 +1386,7 @@ function pointSummaryCard(p){
     <div class="divider"></div>
     <div><b>Tipo de Turma:</b> ${escapeHtml(p.crewType||"—")}</div>
     <div><b>Nº PONTO PROJ.:</b> ${escapeHtml(p.projectPoint||"—")}</div>
-    <div style="margin-top:10px"><b>Estruturas / Subpontos</b>${subs?`<ul>${subs}</ul>`:""}</div>
+    <div style="margin-top:10px"><b>Estruturas / Items</b>${subs?`<ul>${subs}</ul>`:""}</div>
     <div style="margin-top:10px"><b>Ativos / Patrimônios</b>${ids?`<ul>${ids}</ul>`:'<div class="muted">Nenhum.</div>'}</div>
     <div style="margin-top:10px"><b>Serviços executados</b>${srvs?`<ul>${srvs}</ul>`:'<div class="muted">Nenhum.</div>'}</div>
     <div style="margin-top:10px"><b>Materiais aplicados</b>${mats?`<ul>${mats}</ul>`:'<div class="muted">Nenhum.</div>'}</div>
