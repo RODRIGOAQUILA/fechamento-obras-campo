@@ -300,11 +300,11 @@
       <h2>Trechos de Rede</h2>
       <div class="grid grid-2">
         <div>
-          <label>De *</label>
+          <label>De — Nº PONTO PROJ. *</label>
           <select id="sFrom" onchange="handleSegmentEndpointChange()"></select>
         </div>
         <div id="sToWrap">
-          <label>Até *</label>
+          <label>Para — Nº PONTO PROJ. *</label>
           <select id="sTo"></select>
         </div>
 
@@ -322,9 +322,11 @@
 
         <div>
           <label>Condutor / Cabo</label>
-          <select id="sCable">
-            <option value="">Selecione...</option>
-          </select>
+          <div class="search-dropdown">
+            <input id="sCableSearch" placeholder="🔎 Pesquisar condutor/cabo na lista oficial de materiais..." autocomplete="off" oninput="renderCableResults()" onfocus="renderCableResults()">
+            <div id="sCableResults" class="search-results"></div>
+          </div>
+          <input id="sCable" type="hidden">
         </div>
 
         <div>
@@ -481,7 +483,8 @@ async function ensureDB(){
   return await openDB();
 }
 
-function storeGet(storeName,key){
+async function storeGet(storeName,key){
+  await ensureDB();
   return new Promise((resolve,reject)=>{
     const tx=db.transaction(storeName,"readonly");
     const req=tx.objectStore(storeName).get(key);
@@ -489,7 +492,8 @@ function storeGet(storeName,key){
     req.onerror=()=>reject(req.error);
   });
 }
-function storeSet(storeName,key,val){
+async function storeSet(storeName,key,val){
+  await ensureDB();
   return new Promise((resolve,reject)=>{
     const tx=db.transaction(storeName,"readwrite");
     const req=tx.objectStore(storeName).put(val,key);
@@ -507,7 +511,8 @@ async function storePut(storeName,val){
     tx.objectStore(storeName).put(val);
   });
 }
-function storeDelete(storeName,key){
+async function storeDelete(storeName,key){
+  await ensureDB();
   return new Promise((resolve,reject)=>{
     const tx=db.transaction(storeName,"readwrite");
     const req=tx.objectStore(storeName).delete(key);
@@ -515,7 +520,8 @@ function storeDelete(storeName,key){
     req.onerror=()=>reject(req.error);
   });
 }
-function storeGetAll(storeName){
+async function storeGetAll(storeName){
+  await ensureDB();
   return new Promise((resolve,reject)=>{
     const tx=db.transaction(storeName,"readonly");
     const req=tx.objectStore(storeName).getAll();
@@ -523,7 +529,8 @@ function storeGetAll(storeName){
     req.onerror=()=>reject(req.error);
   });
 }
-function storeClear(storeName){
+async function storeClear(storeName){
+  await ensureDB();
   return new Promise((resolve,reject)=>{
     const tx=db.transaction(storeName,"readwrite");
     const req=tx.objectStore(storeName).clear();
@@ -548,8 +555,8 @@ let autoTimer;
 function schedulePersist(){
   clearTimeout(autoTimer);
   autoTimer=setTimeout(async()=>{
-    if(!db) return;
     try{
+      await ensureDB();
       await persistHeader();
       await persistDraft();
     }catch(e){
@@ -891,23 +898,26 @@ function addPhotoFromGallery(){
   if(firstEmptyPhotoSlot()<0){alert("Limite de 20 fotos atingido.");return;}
   galleryInput.value="";galleryInput.click();
 }
-photoInput.addEventListener("change",async e=>{
-  const file=e.target.files?.[0]; if(!file)return;
-  setStatus("Processando foto...");
-  const data=await compressImage(file,1600,.75);
-  currentPhotos[selectedPhotoSlot]={id:uid("photo"),data,name:file.name,createdAt:nowISO()};
-  renderPhotoGrid();schedulePersist();
-});
-galleryInput.addEventListener("change",async e=>{
-  const files=[...(e.target.files||[])];
-  for(const file of files){
-    const slot=firstEmptyPhotoSlot(); if(slot<0)break;
-    setStatus("Processando foto da galeria...");
+function bindLegacyPhotoInputs(){
+  const photoInput=document.getElementById("photoInput");
+  const galleryInput=document.getElementById("galleryInput");
+  if(photoInput) photoInput.addEventListener("change",async e=>{
+    const file=e.target.files?.[0]; if(!file)return;
+    setStatus("Processando foto...");
     const data=await compressImage(file,1600,.75);
-    currentPhotos[slot]={id:uid("photo"),data,name:file.name,createdAt:nowISO()};
-  }
-  renderPhotoGrid();schedulePersist();
-});
+    currentPhotos[selectedPhotoSlot]={id:uid("photo"),data,name:file.name,createdAt:nowISO()};
+    renderPhotoGrid();schedulePersist();
+  });
+  if(galleryInput) galleryInput.addEventListener("change",async e=>{
+    const files=[...(e.target.files||[])];
+    for(const file of files){
+      const slot=firstEmptyPhotoSlot(); if(slot<0)break;
+      const data=await compressImage(file,1600,.75);
+      currentPhotos[slot]={id:uid("photo"),data,name:file.name,createdAt:nowISO()};
+    }
+    renderPhotoGrid();schedulePersist();
+  });
+}
 function removePhoto(i){currentPhotos[i]=null;renderPhotoGrid();schedulePersist();}
 function compressImage(file,maxWidth=1600,quality=.75){
   return new Promise((resolve,reject)=>{
@@ -982,7 +992,7 @@ async function savePoint(){
   renderPointsList();
   renderPointSelects();
   const savedCode=p.code;
-  newPoint(false);
+  newPoint(true);
   setStatus(`${savedCode} salvo`);
   alert(`${savedCode} salvo neste dispositivo. Total de pontos: ${app.points.length}.`);
 }
@@ -1040,22 +1050,48 @@ function renderPointsList(){
 }
 
 
-function populateCableSelect(){
-  sCable.innerHTML='<option value="">Selecione...</option>';
-  CABLES
-    .slice()
-    .sort((a,b)=>(a.name||"").localeCompare((b.name||""),"pt-BR") || (a.code||"").localeCompare((b.code||""),"pt-BR"))
-    .forEach(c=>{
-      const opt=document.createElement("option");
-      opt.value=c.label;
-      opt.textContent=c.label;
-      sCable.appendChild(opt);
-    });
+function renderCableResults(){
+  const input=document.getElementById("sCableSearch"),box=document.getElementById("sCableResults");if(!input||!box)return;
+  // Fonte única: lista oficial completa de materiais. Destacados primeiro; pesquisa por código/descrição.
+  const list=fastSearch(MATERIALS,input.value,120);
+  box.dataset.items=JSON.stringify(list);
+  box.innerHTML=list.length?list.map((x,n)=>`<div class="search-item${x.usual?" usual":""}" onclick="selectCableMaterial(${n})"><b>${escapeHtml(x.code+" - "+x.name)}</b><small>Unidade: ${escapeHtml(x.unit||"")}</small></div>`).join(""):'<div class="search-item">Nenhum material encontrado.</div>';
+  box.style.display="block";
+}
+function selectCableMaterial(n){
+  const box=document.getElementById("sCableResults"),x=JSON.parse(box.dataset.items||"[]")[n];if(!x)return;
+  document.getElementById("sCable").value=JSON.stringify(x);
+  document.getElementById("sCableSearch").value=x.code+" - "+x.name;
+  box.style.display="none";
+}
+function populateCableSelect(){ /* compatibilidade: agora usa pesquisa na lista oficial MATERIALS */ }
+
+
+
+function bindSubPhotoInputs(){
+  const camera=document.getElementById("subPhotoInput"), gallery=document.getElementById("subGalleryInput");
+  if(camera) camera.addEventListener("change",async e=>{
+    try{
+      const f=e.target.files?.[0];if(!f)return;
+      const sp=currentSubpoints[subPhotoTarget.sub];if(!sp)return;
+      const data=await compressImage(f,1600,.75);
+      sp.photos[subPhotoTarget.slot]={id:uid("photo"),data,name:f.name,createdAt:nowISO()};
+      renderSubpoints();await persistDraft();
+    }catch(err){console.error("Erro ao salvar foto",err);alert("Não foi possível processar a foto: "+(err?.message||err));}
+  });
+  if(gallery) gallery.addEventListener("change",async e=>{
+    try{
+      const sp=currentSubpoints[subPhotoTarget.sub];if(!sp)return;
+      for(const f of [...(e.target.files||[])]){
+        const k=[...Array(20).keys()].find(x=>!sp.photos[x]);if(k===undefined)break;
+        const data=await compressImage(f,1600,.75);
+        sp.photos[k]={id:uid("photo"),data,name:f.name,createdAt:nowISO()};
+      }
+      renderSubpoints();await persistDraft();
+    }catch(err){console.error("Erro ao carregar galeria",err);alert("Não foi possível carregar a(s) foto(s): "+(err?.message||err));}
+  });
 }
 
-
-subPhotoInput.addEventListener("change",async e=>{const f=e.target.files?.[0];if(!f)return;const sp=currentSubpoints[subPhotoTarget.sub];const data=await compressImage(f,1600,.75);sp.photos[subPhotoTarget.slot]={id:uid("photo"),data,name:f.name,createdAt:nowISO()};renderSubpoints();schedulePersist()});
-subGalleryInput.addEventListener("change",async e=>{const sp=currentSubpoints[subPhotoTarget.sub];for(const f of [...(e.target.files||[])]){const k=[...Array(20).keys()].find(x=>!sp.photos[x]);if(k===undefined)break;const data=await compressImage(f,1600,.75);sp.photos[k]={id:uid("photo"),data,name:f.name,createdAt:nowISO()}}renderSubpoints();schedulePersist()});
 
 
 let currentSegmentMaterials=[];
@@ -1077,8 +1113,10 @@ function toggleOtherSegmentService(){ return; }
 function renderPointSelects(){
   const pointOpts=app.points.map(p=>{
     const item=normalizeSubpointsFromPoint(p)[0];
+    const proj=(p.projectPoint||"").trim();
     const desc=item?.structure||"Ponto";
-    return `<option value="${p.id}">${escapeHtml(p.code)} — ${escapeHtml(desc)}</option>`;
+    const shown=proj || p.code;
+    return `<option value="${p.id}">${escapeHtml(shown)}${proj?` — ${escapeHtml(p.code)}`:""} — ${escapeHtml(desc)}</option>`;
   });
   sFrom.innerHTML=['<option value="">Selecione...</option>']
     .concat(pointOpts)
@@ -1105,14 +1143,15 @@ async function saveSegment(){
     from:isolated?"":sFrom.value,
     to:isolated?"":sTo.value,
     networkType:sNetworkType.value,
-    cable:sCable.value,
+    cable:(()=>{try{const c=JSON.parse(sCable.value||"null");return c?c.code+" - "+c.name:""}catch(_){return sCable.value||""}})(),
+    cableMaterial:(()=>{try{return JSON.parse(sCable.value||"null")}catch(_){return null}})(),
     lengthExecuted:parseFloat(sLengthExecuted.value)||0,
     service,serviceCode:serviceObj.code,serviceDescription:serviceObj.name,materials:JSON.parse(JSON.stringify(currentSegmentMaterials))
   };
   await storePut("segments",seg);
   app.segments=(await storeGetAll("segments")).sort((a,b)=>(a.createdAt||"").localeCompare(b.createdAt||""));
   renderSegments();renderSummary();
-  sFrom.value="";sTo.value="";sCable.value="";sLengthExecuted.value="";sIsolatedRef.value="";
+  sFrom.value="";sTo.value="";sCable.value="";if(document.getElementById("sCableSearch"))sCableSearch.value="";sLengthExecuted.value="";sIsolatedRef.value="";
   sService.value="";sOtherService.value="";if(document.getElementById("sServiceSearch"))sServiceSearch.value="";if(document.getElementById("sMaterialSearch"))sMaterialSearch.value="";currentSegmentMaterials=[];renderSegmentMaterials();handleSegmentEndpointChange();
   setStatus(`Trecho salvo · Total: ${app.segments.length}`);
 }
@@ -1123,7 +1162,7 @@ function renderSegments(){
   app.segments.forEach(s=>{
     const a=app.points.find(p=>p.id===s.from),b=app.points.find(p=>p.id===s.to);
     const div=document.createElement("div");div.className="list-card";
-    const title=s.isolated?`ISOLADO — ${escapeHtml(s.isolatedRef||"Sem referência")}`:`${a?.code||"?"} → ${b?.code||"?"}`;
+    const title=s.isolated?`ISOLADO — ${escapeHtml(s.isolatedRef||"Sem referência")}`:`${escapeHtml(a?.projectPoint||a?.code||"?")} → ${escapeHtml(b?.projectPoint||b?.code||"?")}`;
     div.innerHTML=`<div class="title">${title}</div>
       <div class="meta">${escapeHtml(s.networkType)} · ${escapeHtml(s.cable||"Sem condutor")} · Executado: ${s.lengthExecuted||0} m · ${escapeHtml(s.service||"")}</div>
       <div class="point-actions no-print"><button class="btn btn-danger" onclick="deleteSegment('${s.id}')">Excluir</button></div>`;
@@ -1284,7 +1323,7 @@ function renderSummarySegments(){
   app.segments.forEach(s=>{
     const a=app.points.find(p=>p.id===s.from),b=app.points.find(p=>p.id===s.to);
     const div=document.createElement("div");div.className="list-card";
-    const title=s.isolated?`ISOLADO — ${escapeHtml(s.isolatedRef||"Sem referência")}`:`${a?.code||"?"} → ${b?.code||"?"}`;
+    const title=s.isolated?`ISOLADO — ${escapeHtml(s.isolatedRef||"Sem referência")}`:`${escapeHtml(a?.projectPoint||a?.code||"?")} → ${escapeHtml(b?.projectPoint||b?.code||"?")}`;
     div.innerHTML=`<div class="title">${title}</div>
       <div class="meta">${escapeHtml(s.networkType)} · ${escapeHtml(s.cable||"")} · ${s.lengthExecuted||0} m · ${escapeHtml(s.service||"")}</div>`;
     summarySegments.appendChild(div);
@@ -1376,7 +1415,7 @@ function escapeHtml(str){
 
 /* AUTOSAVE EM TODOS OS CAMPOS PRINCIPAIS */
 document.querySelectorAll("input,select,textarea").forEach(el=>{
-  if(["photoInput","importFile"].includes(el.id))return;
+  if(["photoInput","galleryInput","subPhotoInput","subGalleryInput","importFile"].includes(el.id))return;
   el.addEventListener("input",schedulePersist);
   el.addEventListener("change",schedulePersist);
 });
@@ -1387,6 +1426,8 @@ window.addEventListener("beforeunload",()=>{
 
 /* INICIALIZAÇÃO */
 (async function init(){
+  bindLegacyPhotoInputs();
+  bindSubPhotoInputs();
   try{
     await ensureDB();
   }catch(e){
@@ -1420,7 +1461,7 @@ window.addEventListener("beforeunload",()=>{
   renderIdentifications();
 
   const draft=await storeGet("draft","current");
-  if(draft && (draft.lat || draft.lng || draft.structure || draft.service || (draft.materials||[]).length)){
+  if(draft && (draft.lat || draft.lng || draft.projectPoint || draft.crewType || (draft.subpoints||[]).length || draft.structure || draft.service || (draft.materials||[]).length)){
     loadDraft(draft);
   }else{
     newPoint(false);
@@ -1431,5 +1472,5 @@ window.addEventListener("beforeunload",()=>{
 
 
 </script>
-<input id="subPhotoInput" type="file" accept="image/*" capture="environment" style="display:none"><input id="subGalleryInput" type="file" accept="image/*" multiple style="display:none"></body>
+<input id="photoInput" type="file" accept="image/*" capture="environment" style="display:none"><input id="galleryInput" type="file" accept="image/*" multiple style="display:none"><input id="subPhotoInput" type="file" accept="image/*" capture="environment" style="display:none"><input id="subGalleryInput" type="file" accept="image/*" multiple style="display:none"></body>
 </html>
