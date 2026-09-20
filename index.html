@@ -398,6 +398,7 @@
   </section>
 </main>
 
+<input id="photoInput" type="file" accept="image/*" capture="environment" style="display:none"><input id="galleryInput" type="file" accept="image/*" multiple style="display:none"><input id="subPhotoInput" type="file" accept="image/*" capture="environment" style="display:none"><input id="subGalleryInput" type="file" accept="image/*" multiple style="display:none">
 <script>
 /* ============================================================
    CONFIGURAÇÃO DAS LISTAS
@@ -627,6 +628,30 @@ function servicesForPoint(p){
   return [];
 }
 
+function pointSubpoints(p){ return normalizeSubpointsFromPoint(p); }
+function pointAssets(p){
+  const out=[]; pointSubpoints(p).forEach(sp=>(sp.assets||[]).forEach(x=>out.push(x)));
+  if(!out.length && Array.isArray(p?.identifications)) return p.identifications;
+  return out;
+}
+function pointMaterials(p){
+  const out=[]; pointSubpoints(p).forEach(sp=>(sp.materials||[]).forEach(x=>out.push(x)));
+  if(!out.length && Array.isArray(p?.materials)) return p.materials;
+  return out;
+}
+function pointServices(p){
+  const out=[]; pointSubpoints(p).forEach(sp=>(sp.services||[]).forEach(x=>out.push(x)));
+  if(!out.length) return servicesForPoint(p);
+  return out;
+}
+function pointPhotos(p){
+  const out=[]; const seen=new Set();
+  const add=x=>{if(!x)return; const k=x.id||x.data||String(out.length); if(!seen.has(k)){seen.add(k);out.push(x)}};
+  (p?.photos||[]).filter(Boolean).forEach(add);
+  pointSubpoints(p).forEach(sp=>(sp.photos||[]).filter(Boolean).forEach(add));
+  return out;
+}
+
 /* ITEMS / ESTRUTURAS DO PONTO */
 function structureOptions(selected=""){
   const groups=[
@@ -821,8 +846,23 @@ function confirmSubService(i){
 function removeSubService(i,j){currentSubpoints[i].services.splice(j,1);renderSubpoints();schedulePersist();}
 
 let subPhotoTarget={sub:0,slot:0};
-function subPhotoCamera(i,k=null){const sp=currentSubpoints[i];if(k===null)k=[...Array(20).keys()].find(x=>!sp.photos[x]);if(k===undefined){alert("Limite de 20 fotos.");return}subPhotoTarget={sub:i,slot:k};subPhotoInput.value="";subPhotoInput.click()}
-function subPhotoGallery(i){subPhotoTarget={sub:i,slot:null};subGalleryInput.value="";subGalleryInput.click()}
+function subPhotoCamera(i,k=null){
+  const sp=currentSubpoints[i];
+  if(!sp)return;
+  if(k===null)k=[...Array(20).keys()].find(x=>!sp.photos[x]);
+  if(k===undefined){alert("Limite de 20 fotos.");return}
+  subPhotoTarget={sub:i,slot:k};
+  const input=document.getElementById("subPhotoInput");
+  if(!input){alert("Entrada de câmera não disponível. Recarregue a página.");return;}
+  input.value="";input.click();
+}
+function subPhotoGallery(i){
+  const sp=currentSubpoints[i];if(!sp)return;
+  subPhotoTarget={sub:i,slot:null};
+  const input=document.getElementById("subGalleryInput");
+  if(!input){alert("Entrada da galeria não disponível. Recarregue a página.");return;}
+  input.value="";input.click();
+}
 function removeSubPhoto(i,k){currentSubpoints[i].photos[k]=null;renderSubpoints();schedulePersist()}
 function subPhotoHTML(sp,i){let h='<div class="sub-photo-grid">';for(let k=0;k<20;k++){let p=sp.photos[k];h+=`<div class="sub-photo-slot" onclick="subPhotoCamera(${i},${k})">${p?`<img src="${p.data}"><button class="remove" onclick="event.stopPropagation();removeSubPhoto(${i},${k})">×</button>`:`📷<br>FOTO ${String(k+1).padStart(2,"0")}`}</div>`}return h+"</div>"}
 
@@ -892,11 +932,11 @@ function renderPhotoGrid(){
 function choosePhoto(i){ selectedPhotoSlot=i; addPhotoFromCamera(i); }
 function addPhotoFromCamera(slot=null){
   if(slot===null){slot=firstEmptyPhotoSlot(); if(slot<0){alert("Limite de 20 fotos atingido.");return;}}
-  selectedPhotoSlot=slot; photoInput.value=""; photoInput.click();
+  selectedPhotoSlot=slot; const input=document.getElementById("photoInput"); if(!input)return; input.value=""; input.click();
 }
 function addPhotoFromGallery(){
   if(firstEmptyPhotoSlot()<0){alert("Limite de 20 fotos atingido.");return;}
-  galleryInput.value="";galleryInput.click();
+  const input=document.getElementById("galleryInput"); if(!input)return; input.value="";input.click();
 }
 function bindLegacyPhotoInputs(){
   const photoInput=document.getElementById("photoInput");
@@ -955,6 +995,7 @@ function collectDraftPoint(){
     projectPoint:(document.getElementById("pProjectPoint")?.value||"").trim(),
     crewType:document.getElementById("pCrewType")?.value||"",
     subpoints:JSON.parse(JSON.stringify((currentSubpoints||[]).map(ensureSubpoint))),
+    photos:JSON.parse(JSON.stringify((currentPhotos||[]).filter(Boolean))),
     notes:(document.getElementById("pNotes")?.value||"").trim()
   };
 }
@@ -1016,7 +1057,8 @@ function editPoint(id){
   document.getElementById("pProjectPoint").value=p.projectPoint||"";document.getElementById("pCrewType").value=p.crewType||"";
   document.getElementById("pNotes").value=p.notes||"";
   currentSubpoints=normalizeSubpointsFromPoint(p);
-  renderSubpoints();
+  currentPhotos=Array.isArray(p.photos)?JSON.parse(JSON.stringify(p.photos)):[];
+  renderSubpoints();renderPhotoGrid();
   pointTitle.textContent="Editar "+p.code;pointCodeBadge.textContent=p.code;pointCodeBadge.className="badge badge-yellow";
   switchPanel("formPanel");window.scrollTo({top:0,behavior:"smooth"});
 }
@@ -1034,11 +1076,13 @@ function renderPointsList(){
   if(!app.points.length){pointsList.innerHTML='<div class="empty">Nenhum ponto cadastrado.</div>';return}
   app.points.slice().sort((a,b)=>a.createdAt.localeCompare(b.createdAt)).forEach(p=>{
     const div=document.createElement("div");div.className="list-card";
-    const c=p.conformity==="CONFORME"?'<span class="badge badge-green">CONFORME</span>':'<span class="badge badge-yellow">AJUSTE</span>';
+    const pointName=(p.projectPoint||"").trim();
+    const pointBadge=pointName?`<span class="badge badge-yellow">${escapeHtml(pointName)}</span>`:"";
+    const structures=pointSubpoints(p).map(sp=>sp.structure).filter(Boolean).join(" / ")||"Sem estrutura";
     div.innerHTML=`
       <div class="row" style="justify-content:space-between">
-        <div><div class="title">${p.code} ${c}</div>
-        <div class="meta">${escapeHtml(p.postSituation||"")} · ${escapeHtml(p.structure||"Sem estrutura")} · ${escapeHtml(p.service||"")}</div>
+        <div><div class="title">${p.code} ${pointBadge}</div>
+        <div class="meta">${escapeHtml(structures)}</div>
         <div class="meta">${p.lat?.toFixed?.(6)??p.lat}, ${p.lng?.toFixed?.(6)??p.lng} · ${localDateTime(p.createdAt)}</div></div>
       </div>
       <div class="point-actions no-print">
@@ -1190,7 +1234,7 @@ function renderSummary(){
 }
 function renderMaterialSummary(){
   const agg={};
-  app.points.forEach(p=>(p.materials||[]).forEach(m=>{
+  app.points.forEach(p=>pointMaterials(p).forEach(m=>{
     const k=m.name+"|"+m.unit;
     if(!agg[k])agg[k]={name:m.name,unit:m.unit,qty:0};
     agg[k].qty+=Number(m.qty)||0;
@@ -1205,14 +1249,14 @@ function renderMaterialSummary(){
 }
 
 function pointSummaryCard(p){
-  const ids=(p.identifications||[]).filter(x=>x.number).map(x=>`<li><b>${escapeHtml(x.type)}:</b> ${escapeHtml(x.number)}</li>`).join("");
-  const mats=(p.materials||[]).map(m=>`<li>${escapeHtml(m.name)} — <b>${m.qty} ${escapeHtml(m.unit)}</b></li>`).join("");
-  const srvs=servicesForPoint(p).map(s=>`<li>${escapeHtml(`${s.code}${s.code?" - ":""}${s.name||s.label||""}`)}</li>`).join("");
+  const ids=pointAssets(p).filter(x=>x.number).map(x=>`<li><b>${escapeHtml(x.type)}:</b> ${escapeHtml(x.number)}</li>`).join("");
+  const mats=pointMaterials(p).map(m=>`<li>${escapeHtml(m.name)} — <b>${m.qty} ${escapeHtml(m.unit)}</b></li>`).join("");
+  const srvs=pointServices(p).map(s=>`<li>${escapeHtml(`${s.code}${s.code?" - ":""}${s.name||s.label||""}`)}</li>`).join("");
   const subs=normalizeSubpointsFromPoint(p).map((sp,i)=>{
     const act=sp.action==="OUTRO"?(sp.otherAction||"OUTRO"):sp.action;
     return `<li><b>Item ${i+1}:</b> ${escapeHtml(act||"—")} · ${escapeHtml(sp.structure||"—")} · Qtd ${sp.qty||0}</li>`;
   }).join("");
-  const photos=(p.photos||[]).length;
+  const photos=pointPhotos(p).length;
   return `<div class="row" style="justify-content:space-between;align-items:flex-start">
       <div><div class="title">${escapeHtml(p.code)}</div><div class="meta">${localDateTime(p.createdAt)} · ${p.lat?.toFixed?.(6)??p.lat}, ${p.lng?.toFixed?.(6)??p.lng}</div></div>
       
@@ -1258,16 +1302,16 @@ function renderSummaryPoints(){
     .slice()
     .sort((a,b)=>a.createdAt.localeCompare(b.createdAt))
     .forEach(p=>{
-      const ids=(p.identifications||[]).filter(x=>x.number)
+      const ids=pointAssets(p).filter(x=>x.number)
         .map(x=>`<li><b>${escapeHtml(x.type)}:</b> ${escapeHtml(x.number)}</li>`).join("");
 
-      const mats=(p.materials||[])
+      const mats=pointMaterials(p)
         .map(m=>`<li>${escapeHtml(m.name)} — <b>${m.qty} ${escapeHtml(m.unit)}</b></li>`).join("");
 
-      const srvs=servicesForPoint(p)
+      const srvs=pointServices(p)
         .map(s=>`<li>${escapeHtml(`${s.code}${s.code?" - ":""}${s.name||s.label||""}`)}</li>`).join("");
 
-      const photos=(p.photos||[]).length;
+      const photos=pointPhotos(p).length;
       const div=document.createElement("div");
       div.className="list-card";
       div.innerHTML=`
@@ -1333,7 +1377,7 @@ function renderSummarySegments(){
 function renderServiceSummary(){
   const agg={};
   app.points.forEach(p=>{
-    servicesForPoint(p).forEach(s=>{
+    pointServices(p).forEach(s=>{
       const code=s.code||"SEM CÓDIGO";
       const desc=s.name||s.label||"Serviço não informado";
       const key=code+"|"+desc;
@@ -1352,7 +1396,7 @@ function renderServiceSummary(){
 
 function renderAssetSummary(){
   const rows=[];
-  app.points.forEach(p=>(p.identifications||[]).forEach(x=>{
+  app.points.forEach(p=>pointAssets(p).forEach(x=>{
     if((x.number||"").trim()){
       rows.push({point:p.code,type:x.type,number:x.number});
     }
@@ -1378,7 +1422,9 @@ function loadDraft(p){
   document.getElementById("pLat").value=p.lat||"";document.getElementById("pLng").value=p.lng||"";
   document.getElementById("pProjectPoint").value=p.projectPoint||"";document.getElementById("pCrewType").value=p.crewType||"";
   document.getElementById("pNotes").value=p.notes||"";
-  currentSubpoints=normalizeSubpointsFromPoint(p);renderSubpoints();
+  currentSubpoints=normalizeSubpointsFromPoint(p);
+  currentPhotos=Array.isArray(p.photos)?JSON.parse(JSON.stringify(p.photos)):[];
+  renderSubpoints();renderPhotoGrid();
   pointTitle.textContent=editingPointId?"Editar "+p.code:"Ponto em andamento";
   pointCodeBadge.textContent=p.code||pointCode(nextPointNumber());
 }
@@ -1472,5 +1518,5 @@ window.addEventListener("beforeunload",()=>{
 
 
 </script>
-<input id="photoInput" type="file" accept="image/*" capture="environment" style="display:none"><input id="galleryInput" type="file" accept="image/*" multiple style="display:none"><input id="subPhotoInput" type="file" accept="image/*" capture="environment" style="display:none"><input id="subGalleryInput" type="file" accept="image/*" multiple style="display:none"></body>
+</body>
 </html>
