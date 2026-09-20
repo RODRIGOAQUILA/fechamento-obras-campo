@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <meta name="theme-color" content="#0f172a" />
-  <title>Equatorial - Fechamento de Obra v13.0</title>
+  <title>Equatorial - Fechamento de Obra v13.1</title>
 
   <!-- Leaflet (mapa). Os dados do formulário continuam salvos mesmo sem internet.
        Sem internet, apenas o mapa-base do OpenStreetMap pode não carregar. -->
@@ -422,7 +422,7 @@ let db;
 function normalizeSearch(v){return String(v||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toUpperCase();}
 MATERIALS.forEach(x=>x._search=normalizeSearch(`${x.code} ${x.name}`));
 SERVICES.forEach(x=>x._search=normalizeSearch(`${x.code} ${x.name}`));
-function fastSearch(list,q,limit=60){const term=normalizeSearch(q).trim();const base=term?list.filter(x=>x._search.includes(term)):list.filter(x=>x.usual);return base.slice().sort((a,b)=>(b.usual?1:0)-(a.usual?1:0)).slice(0,limit);}
+function fastSearch(list,q,limit=120){const term=normalizeSearch(q).trim();const sorted=list.slice().sort((a,b)=>(b.usual?1:0)-(a.usual?1:0));if(!term)return sorted;return sorted.filter(x=>x._search.includes(term)).slice(0,limit);}
 
 let app = {
   header: {equipe:"",base:"",obra:"",pep:"",os:"",encarregado:""},
@@ -452,8 +452,12 @@ function flashSaved(){
   setTimeout(()=>setStatus("Salvamento automático ativo"),1800);
 }
 
+let dbOpeningPromise = null;
 function openDB(){
-  return new Promise((resolve,reject)=>{
+  if(db) return Promise.resolve(db);
+  if(dbOpeningPromise) return dbOpeningPromise;
+  dbOpeningPromise = new Promise((resolve,reject)=>{
+    if(!window.indexedDB){ reject(new Error("Este navegador não disponibilizou o banco local IndexedDB.")); return; }
     const req = indexedDB.open(DB_NAME, DB_VERSION);
     req.onupgradeneeded = e=>{
       const d=e.target.result;
@@ -462,9 +466,19 @@ function openDB(){
       if(!d.objectStoreNames.contains("segments")) d.createObjectStore("segments",{keyPath:"id"});
       if(!d.objectStoreNames.contains("draft")) d.createObjectStore("draft");
     };
-    req.onsuccess = e=>{ db=e.target.result; resolve(db); };
-    req.onerror = e=>reject(e);
-  });
+    req.onsuccess = e=>{
+      db=e.target.result;
+      db.onversionchange=()=>{ try{db.close();}catch(_){} db=null; dbOpeningPromise=null; };
+      resolve(db);
+    };
+    req.onerror = ()=>reject(req.error||new Error("Falha ao abrir o banco local."));
+    req.onblocked = ()=>console.warn("A abertura do banco local foi bloqueada por outra aba antiga do aplicativo.");
+  }).catch(err=>{dbOpeningPromise=null; throw err;});
+  return dbOpeningPromise;
+}
+async function ensureDB(){
+  if(db) return db;
+  return await openDB();
 }
 
 function storeGet(storeName,key){
@@ -483,9 +497,9 @@ function storeSet(storeName,key,val){
     req.onerror=()=>reject(req.error);
   });
 }
-function storePut(storeName,val){
+async function storePut(storeName,val){
+  await ensureDB();
   return new Promise((resolve,reject)=>{
-    if(!db) return reject(new Error("Banco local ainda não inicializado."));
     const tx=db.transaction(storeName,"readwrite");
     tx.oncomplete=()=>resolve();
     tx.onerror=()=>reject(tx.error||new Error("Falha na transação de gravação."));
@@ -951,6 +965,7 @@ async function savePoint(){
 
   try{
     setStatus("Salvando ponto...");
+    await ensureDB();
     await storePut("points",p);
     const check=await storeGet("points",p.id);
     if(!check) throw new Error("O ponto não foi confirmado no banco local.");
@@ -1372,7 +1387,14 @@ window.addEventListener("beforeunload",()=>{
 
 /* INICIALIZAÇÃO */
 (async function init(){
-  await openDB();
+  try{
+    await ensureDB();
+  }catch(e){
+    console.error("ERRO AO INICIALIZAR BANCO LOCAL",e);
+    setStatus("Falha ao iniciar banco local");
+    alert("Não foi possível inicializar o banco local. Recarregue a página. Detalhe: "+(e?.message||e));
+    return;
+  }
 
   const savedHeader=await storeGet("meta","header");
   if(savedHeader){
