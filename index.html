@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <meta name="theme-color" content="#0f172a" />
-  <title>Equatorial - Fechamento de Obra v13.1</title>
+  <title>Equatorial - Fechamento de Obra v13.2</title>
 
   <!-- Leaflet (mapa). Os dados do formulário continuam salvos mesmo sem internet.
        Sem internet, apenas o mapa-base do OpenStreetMap pode não carregar. -->
@@ -316,6 +316,7 @@
         <div>
           <label>Tipo de rede</label>
           <select id="sNetworkType">
+            <option value="">Selecione...</option>
             <option>BT</option><option>MT</option><option>AT</option><option>OUTRO</option>
           </select>
         </div>
@@ -335,13 +336,16 @@
         </div>
 
         <div class="grid-span-2">
-          <label>Serviço / Intervenção</label>
-          <div class="search-dropdown"><input id="sServiceSearch" placeholder="🔎 Pesquisar serviço por código ou descrição..." autocomplete="off" oninput="renderSegmentServiceResults()" onfocus="renderSegmentServiceResults()"><div id="sServiceResults" class="search-results"></div></div>
-          <input id="sService" type="hidden"><input id="sOtherService" type="hidden"><div id="sOtherServiceWrap" style="display:none"></div>
+          <div class="sub-section-title">Serviços Executados</div>
+          <div id="segmentServicesList"><div class="muted">Nenhum serviço.</div></div>
+          <button type="button" class="btn btn-secondary" onclick="openSegmentEditor('service')">ADICIONAR SERVIÇO</button>
+          <div id="segmentServiceEditor"></div>
         </div>
         <div class="grid-span-2">
-          <label>Materiais do trecho</label><div id="segmentMaterialsList" class="muted">Nenhum material.</div>
-          <div class="search-dropdown" style="margin-top:8px"><input id="sMaterialSearch" placeholder="🔎 Pesquisar material por código ou descrição..." autocomplete="off" oninput="renderSegmentMaterialResults()" onfocus="renderSegmentMaterialResults()"><div id="sMaterialResults" class="search-results"></div></div>
+          <div class="sub-section-title">Materiais Aplicados</div>
+          <div id="segmentMaterialsList"><div class="muted">Nenhum material.</div></div>
+          <button type="button" class="btn btn-secondary" onclick="openSegmentEditor('material')">ADICIONAR MATERIAL</button>
+          <div id="segmentMaterialEditor"></div>
         </div>
       </div>
 
@@ -693,7 +697,7 @@ function removeSubpoint(i){
 }
 
 function ensureSubpoint(sp={}){
-  return {id:sp.id||uid("sub"),action:sp.action||"",structure:sp.structure||"",qty:Number(sp.qty)||1,otherAction:sp.otherAction||"",
+  return {id:sp.id||uid("sub"),action:sp.action||"",structure:sp.structure||"",qty:(sp.qty===0||sp.qty?Number(sp.qty):""),otherAction:sp.otherAction||"",
     assets:Array.isArray(sp.assets)?sp.assets:[],materials:Array.isArray(sp.materials)?sp.materials:[],
     services:Array.isArray(sp.services)?sp.services:[],photos:Array.isArray(sp.photos)?sp.photos.slice(0,20):[]};
 }
@@ -723,7 +727,8 @@ function assetEditorHTML(i){
       <div>
         <label>Tipo de Ativo</label>
         <select id="asset-type-${i}" onchange="toggleAssetExtraFields(${i})">
-          ${ASSET_TYPES.map(x=>`<option>${escapeHtml(x)}</option>`).join("")}
+          <option value="">Selecione...</option>
+          ${ASSET_TYPES.map(x=>`<option value="${escapeHtml(x)}">${escapeHtml(x)}</option>`).join("")}
         </select>
       </div>
       <div><label>Nº Patrimônio / Identificação</label><input id="asset-number-${i}" placeholder="Digite o número do ativo"></div>
@@ -757,6 +762,7 @@ function toggleAssetExtraFields(i){
 function confirmSubAsset(i){
   const type=document.getElementById(`asset-type-${i}`).value;
   const number=document.getElementById(`asset-number-${i}`).value.trim();
+  if(!type){alert("Selecione o Tipo de Ativo.");return}
   if(!number){alert("Informe o Nº Patrimônio / Identificação.");return}
   const asset={id:uid("asset"),type,number};
   if(type==="TRANSFORMADOR"){
@@ -780,7 +786,7 @@ function materialEditorHTML(i){
       <input id="material-selected-${i}" type="hidden">
     </div>
     <div class="grid grid-2" style="margin-top:8px">
-      <div><label>Quantidade</label><input id="material-qty-${i}" type="number" min="0.01" step="0.01" value="1"></div>
+      <div><label>Quantidade</label><input id="material-qty-${i}" type="number" min="0.01" step="0.01" placeholder="Informe a quantidade"></div>
       <div><label>Unidade</label><input id="material-unit-${i}" readonly placeholder="Automático"></div>
     </div>
     <div class="row" style="margin-top:8px"><button class="btn btn-primary" onclick="confirmSubMaterial(${i})">ADICIONAR MATERIAL</button><button class="btn btn-secondary" onclick="closeSubEditor()">Cancelar</button></div>
@@ -894,7 +900,7 @@ function renderSubpoints(){
          </div>
        </div>
        <div><label>Estrutura *</label><select data-sub="${i}" data-k="structure">${structureOptions(sp.structure)}</select></div>
-       <div><label>Quantidade de estrutura *</label><input data-sub="${i}" data-k="qty" type="number" min="1" value="${sp.qty||1}"></div>
+       <div><label>Quantidade de estrutura *</label><input data-sub="${i}" data-k="qty" type="number" min="1" value="${sp.qty!==""&&sp.qty!=null?sp.qty:""}"></div>
       </div>
       <div class="sub-section"><div class="sub-section-title">Ativos / Patrimônios</div>${assets||'<div class="muted">Nenhum ativo.</div>'}<button class="btn btn-secondary" onclick="openSubEditor('asset',${i})">ADICIONAR ATIVO</button>${assetEditorHTML(i)}</div>
       <div class="sub-section"><div class="sub-section-title">Materiais Aplicados</div>${mats||'<div class="muted">Nenhum material.</div>'}<button class="btn btn-secondary" onclick="openSubEditor('material',${i})">ADICIONAR MATERIAL</button>${materialEditorHTML(i)}</div>
@@ -905,7 +911,7 @@ function renderSubpoints(){
   list.querySelectorAll("[data-sub]").forEach(el=>el.addEventListener(el.tagName==="SELECT"?"change":"input",e=>{const i=+e.target.dataset.sub,k=e.target.dataset.k;currentSubpoints[i][k]=k==="qty"?(parseInt(e.target.value)||0):e.target.value;if(k==="action")renderSubpoints();schedulePersist()}));
 }
 function normalizeSubpointsFromPoint(p){
- let arr=Array.isArray(p.subpoints)&&p.subpoints.length?p.subpoints.map(ensureSubpoint):[ensureSubpoint({action:p.action||normalizeAction(p.postSituation)||"",structure:p.structure||"",qty:p.structureQty||1})];
+ let arr=Array.isArray(p.subpoints)&&p.subpoints.length?p.subpoints.map(ensureSubpoint):[ensureSubpoint({action:p.action||normalizeAction(p.postSituation)||"",structure:p.structure||"",qty:p.structureQty??""})];
  if(arr[0]){if(!arr[0].assets.length&&p.identifications)arr[0].assets=JSON.parse(JSON.stringify(p.identifications));if(!arr[0].materials.length&&p.materials)arr[0].materials=JSON.parse(JSON.stringify(p.materials));if(!arr[0].services.length)arr[0].services=servicesForPoint(p);if(!arr[0].photos.length&&p.photos)arr[0].photos=JSON.parse(JSON.stringify(p.photos)).slice(0,20)}
  return arr;
 }
@@ -1139,11 +1145,27 @@ function bindSubPhotoInputs(){
 
 
 let currentSegmentMaterials=[];
-function renderSegmentServiceResults(){const input=document.getElementById("sServiceSearch"),box=document.getElementById("sServiceResults");if(!input||!box)return;const list=fastSearch(SERVICES,input.value,60);box.dataset.items=JSON.stringify(list);box.innerHTML=list.length?list.map((x,n)=>`<div class="search-item${x.usual?" usual":""}${x.training?" training":""}" onclick="selectSegmentService(${n})"><b>${escapeHtml(x.code+" - "+x.name)}</b><small>${escapeHtml(x.unit||"")}</small></div>`).join(""):'<div class="search-item">Nenhum serviço encontrado.</div>';box.style.display="block";}
-function selectSegmentService(n){const box=document.getElementById("sServiceResults"),x=JSON.parse(box.dataset.items||"[]")[n];if(!x)return;sService.value=JSON.stringify(x);sServiceSearch.value=x.code+" - "+x.name;box.style.display="none";}
-function renderSegmentMaterialResults(){const input=document.getElementById("sMaterialSearch"),box=document.getElementById("sMaterialResults");if(!input||!box)return;const list=fastSearch(MATERIALS,input.value,60);box.dataset.items=JSON.stringify(list);box.innerHTML=list.length?list.map((x,n)=>`<div class="search-item${x.usual?" usual":""}" onclick="selectSegmentMaterial(${n})"><b>${escapeHtml(x.code+" - "+x.name)}</b><small>Unidade: ${escapeHtml(x.unit||"")}</small></div>`).join(""):'<div class="search-item">Nenhum material encontrado.</div>';box.style.display="block";}
-function selectSegmentMaterial(n){const box=document.getElementById("sMaterialResults"),x=JSON.parse(box.dataset.items||"[]")[n];if(!x)return;const raw=prompt("Quantidade de "+(x.unit||"UN")+":","1");if(raw===null)return;const qty=parseFloat(String(raw).replace(",","."));if(!(qty>0)){alert("Informe uma quantidade válida.");return;}currentSegmentMaterials.push({id:uid("mat"),code:x.code,name:x.name,label:x.label,unit:x.unit,qty});sMaterialSearch.value="";box.style.display="none";renderSegmentMaterials();}
-function renderSegmentMaterials(){const el=document.getElementById("segmentMaterialsList");if(!el)return;el.innerHTML=currentSegmentMaterials.length?currentSegmentMaterials.map((x,i)=>`<div class="list-card"><b>${escapeHtml(x.code+" - "+x.name)}</b> · ${x.qty} ${escapeHtml(x.unit||"")} <button class="btn btn-danger" onclick="currentSegmentMaterials.splice(${i},1);renderSegmentMaterials()">Excluir</button></div>`).join(""):'<div class="muted">Nenhum material.</div>';}
+let currentSegmentServices=[];
+let segmentEditor=null;
+
+function openSegmentEditor(type){segmentEditor=type;renderSegmentEditors();setTimeout(()=>document.getElementById(type==="service"?"sServiceSearch":"sMaterialSearch")?.focus(),30);}
+function closeSegmentEditor(){segmentEditor=null;renderSegmentEditors();}
+function renderSegmentEditors(){
+ const se=document.getElementById("segmentServiceEditor"),me=document.getElementById("segmentMaterialEditor");
+ if(se)se.innerHTML=segmentEditor==="service"?`<div class="sub-inline-editor"><label>Serviço</label><div class="search-dropdown"><input id="sServiceSearch" placeholder="🔎 Pesquisar por código ou descrição..." autocomplete="off" oninput="renderSegmentServiceResults()" onfocus="renderSegmentServiceResults()"><div id="sServiceResults" class="search-results"></div><input id="sServiceSelected" type="hidden"></div><div class="row" style="margin-top:8px"><button type="button" class="btn btn-primary" onclick="confirmSegmentService()">ADICIONAR SERVIÇO</button><button type="button" class="btn btn-secondary" onclick="closeSegmentEditor()">Cancelar</button></div></div>`:"";
+ if(me)me.innerHTML=segmentEditor==="material"?`<div class="sub-inline-editor"><label>Material</label><div class="search-dropdown"><input id="sMaterialSearch" placeholder="🔎 Pesquisar por código ou descrição..." autocomplete="off" oninput="renderSegmentMaterialResults()" onfocus="renderSegmentMaterialResults()"><div id="sMaterialResults" class="search-results"></div><input id="sMaterialSelected" type="hidden"></div><div class="grid grid-2" style="margin-top:8px"><div><label>Quantidade</label><input id="sMaterialQty" type="number" min="0.01" step="0.01" placeholder="Informe a quantidade"></div><div><label>Unidade</label><input id="sMaterialUnit" readonly placeholder="Automático"></div></div><div class="row" style="margin-top:8px"><button type="button" class="btn btn-primary" onclick="confirmSegmentMaterial()">ADICIONAR MATERIAL</button><button type="button" class="btn btn-secondary" onclick="closeSegmentEditor()">Cancelar</button></div></div>`:"";
+}
+function renderSegmentServiceResults(){const input=document.getElementById("sServiceSearch"),box=document.getElementById("sServiceResults");if(!input||!box)return;const list=fastSearch(SERVICES,input.value,60);box.dataset.items=JSON.stringify(list);box.innerHTML=list.length?list.map((x,n)=>`<div class="search-item${x.training?" training":(x.usual?" usual":"")}" onclick="selectSegmentService(${n})"><b>${escapeHtml(`${x.code||""}${x.code?" - ":""}${x.name||x.label||""}`)}</b>${x.unit?`<small>Unidade: ${escapeHtml(x.unit)}</small>`:""}</div>`).join(""):'<div class="search-item">Nenhum serviço encontrado.</div>';box.style.display="block";}
+function selectSegmentService(n){const box=document.getElementById("sServiceResults"),x=JSON.parse(box?.dataset.items||"[]")[n];if(!x)return;document.getElementById("sServiceSelected").value=JSON.stringify(x);document.getElementById("sServiceSearch").value=`${x.code||""}${x.code?" - ":""}${x.name||x.label||""}`;box.style.display="none";}
+function confirmSegmentService(){const raw=document.getElementById("sServiceSelected")?.value||"";if(!raw){alert("Selecione um serviço da lista.");return}const x=JSON.parse(raw);currentSegmentServices.push({id:uid("srv"),code:x.code||"",name:x.name||x.label||"",label:x.label||"",unit:x.unit||"",training:!!x.training,usual:!!x.usual});segmentEditor=null;renderSegmentServices();renderSegmentEditors();}
+function removeSegmentService(i){currentSegmentServices.splice(i,1);renderSegmentServices();}
+function renderSegmentServices(){const el=document.getElementById("segmentServicesList");if(!el)return;el.innerHTML=currentSegmentServices.length?currentSegmentServices.map((x,i)=>`<div class="list-card"><b style="${x.training?"color:#15803d":""}">${escapeHtml(`${x.code||""}${x.code?" - ":""}${x.name||""}`)}</b> <button type="button" class="btn btn-danger" onclick="removeSegmentService(${i})">Excluir</button></div>`).join(""):'<div class="muted">Nenhum serviço.</div>';}
+
+function renderSegmentMaterialResults(){const input=document.getElementById("sMaterialSearch"),box=document.getElementById("sMaterialResults");if(!input||!box)return;const list=fastSearch(MATERIALS,input.value,60);box.dataset.items=JSON.stringify(list);box.innerHTML=list.length?list.map((x,n)=>`<div class="search-item${x.usual?" usual":""}" onclick="selectSegmentMaterial(${n})"><b>${escapeHtml(`${x.code||""}${x.code?" - ":""}${x.name||x.label||""}`)}</b>${x.unit?`<small>Unidade: ${escapeHtml(x.unit)}</small>`:""}</div>`).join(""):'<div class="search-item">Nenhum material encontrado.</div>';box.style.display="block";}
+function selectSegmentMaterial(n){const box=document.getElementById("sMaterialResults"),x=JSON.parse(box?.dataset.items||"[]")[n];if(!x)return;document.getElementById("sMaterialSelected").value=JSON.stringify(x);document.getElementById("sMaterialSearch").value=`${x.code||""}${x.code?" - ":""}${x.name||x.label||""}`;document.getElementById("sMaterialUnit").value=x.unit||"";box.style.display="none";}
+function confirmSegmentMaterial(){const raw=document.getElementById("sMaterialSelected")?.value||"";if(!raw){alert("Selecione um material da lista.");return}const x=JSON.parse(raw),qty=parseFloat(document.getElementById("sMaterialQty")?.value||"");if(!(qty>0)){alert("Informe a quantidade.");return}currentSegmentMaterials.push({id:uid("mat"),code:x.code||"",name:x.name||x.label||"",label:x.label||"",unit:x.unit||"",qty});segmentEditor=null;renderSegmentMaterials();renderSegmentEditors();}
+function removeSegmentMaterial(i){currentSegmentMaterials.splice(i,1);renderSegmentMaterials();}
+function renderSegmentMaterials(){const el=document.getElementById("segmentMaterialsList");if(!el)return;el.innerHTML=currentSegmentMaterials.length?currentSegmentMaterials.map((x,i)=>`<div class="list-card"><b>${escapeHtml(`${x.code||""}${x.code?" - ":""}${x.name||""}`)}</b> · ${x.qty} ${escapeHtml(x.unit||"")} <button type="button" class="btn btn-danger" onclick="removeSegmentMaterial(${i})">Excluir</button></div>`).join(""):'<div class="muted">Nenhum material.</div>';}
 
 /* TRECHOS */
 function handleSegmentEndpointChange(){
@@ -1176,9 +1198,7 @@ async function saveSegment(){
   }else if(!sFrom.value||!sTo.value||sFrom.value===sTo.value){
     alert("Selecione dois pontos diferentes ou escolha TRECHO ISOLADO.");return;
   }
-  if(!sService.value){alert("Selecione um Serviço / Intervenção da lista completa.");return;}
-  let serviceObj;try{serviceObj=JSON.parse(sService.value)}catch(e){alert("Selecione novamente o Serviço / Intervenção.");return;}
-  const service=serviceObj.code+" - "+serviceObj.name;
+  if(!currentSegmentServices.length){alert("Adicione pelo menos um SERVIÇO ao trecho.");return;}
   const seg={
     id:uid("seg"),
     createdAt:nowISO(),
@@ -1190,13 +1210,14 @@ async function saveSegment(){
     cable:(()=>{try{const c=JSON.parse(sCable.value||"null");return c?c.code+" - "+c.name:""}catch(_){return sCable.value||""}})(),
     cableMaterial:(()=>{try{return JSON.parse(sCable.value||"null")}catch(_){return null}})(),
     lengthExecuted:parseFloat(sLengthExecuted.value)||0,
-    service,serviceCode:serviceObj.code,serviceDescription:serviceObj.name,materials:JSON.parse(JSON.stringify(currentSegmentMaterials))
+    services:JSON.parse(JSON.stringify(currentSegmentServices)),
+    materials:JSON.parse(JSON.stringify(currentSegmentMaterials))
   };
   await storePut("segments",seg);
   app.segments=(await storeGetAll("segments")).sort((a,b)=>(a.createdAt||"").localeCompare(b.createdAt||""));
   renderSegments();renderSummary();
-  sFrom.value="";sTo.value="";sCable.value="";if(document.getElementById("sCableSearch"))sCableSearch.value="";sLengthExecuted.value="";sIsolatedRef.value="";
-  sService.value="";sOtherService.value="";if(document.getElementById("sServiceSearch"))sServiceSearch.value="";if(document.getElementById("sMaterialSearch"))sMaterialSearch.value="";currentSegmentMaterials=[];renderSegmentMaterials();handleSegmentEndpointChange();
+  sFrom.value="";sTo.value="";sNetworkType.value="";sCable.value="";if(document.getElementById("sCableSearch"))document.getElementById("sCableSearch").value="";sLengthExecuted.value="";sIsolatedRef.value="";
+  currentSegmentServices=[];currentSegmentMaterials=[];segmentEditor=null;renderSegmentServices();renderSegmentMaterials();renderSegmentEditors();handleSegmentEndpointChange();
   setStatus(`Trecho salvo · Total: ${app.segments.length}`);
 }
 function renderSegments(){
@@ -1208,7 +1229,9 @@ function renderSegments(){
     const div=document.createElement("div");div.className="list-card";
     const title=s.isolated?`ISOLADO — ${escapeHtml(s.isolatedRef||"Sem referência")}`:`${escapeHtml(a?.projectPoint||a?.code||"?")} → ${escapeHtml(b?.projectPoint||b?.code||"?")}`;
     div.innerHTML=`<div class="title">${title}</div>
-      <div class="meta">${escapeHtml(s.networkType)} · ${escapeHtml(s.cable||"Sem condutor")} · Executado: ${s.lengthExecuted||0} m · ${escapeHtml(s.service||"")}</div>
+      <div class="meta">${escapeHtml(s.networkType||"—")} · ${escapeHtml(s.cable||"Sem condutor")} · Executado: ${s.lengthExecuted||0} m</div>
+      <div class="meta"><b>Serviços:</b> ${escapeHtml(((s.services&&s.services.length)?s.services.map(x=>`${x.code||""}${x.code?" - ":""}${x.name||""}`):[s.service||""]).filter(Boolean).join(" | ")||"Nenhum")}</div>
+      <div class="meta"><b>Materiais:</b> ${escapeHtml((s.materials||[]).map(x=>`${x.code||""}${x.code?" - ":""}${x.name||""} (${x.qty||0} ${x.unit||""})`).join(" | ")||"Nenhum")}</div>
       <div class="point-actions no-print"><button class="btn btn-danger" onclick="deleteSegment('${s.id}')">Excluir</button></div>`;
     segmentsList.appendChild(div);
   });
@@ -1274,8 +1297,12 @@ function pointSummaryCard(p){
 function segmentSummaryCard(s){
   const a=app.points.find(p=>p.id===s.from),b=app.points.find(p=>p.id===s.to);
   const title=s.isolated?`TRECHO / PONTO ISOLADO — ${escapeHtml(s.isolatedRef||"Sem referência")}`:`${a?.code||"?"} → ${b?.code||"?"}`;
+  const srvs=((s.services&&s.services.length)?s.services.map(x=>`${x.code||""}${x.code?" - ":""}${x.name||""}`):[s.service||""]).filter(Boolean);
+  const mats=(s.materials||[]).map(x=>`${x.code||""}${x.code?" - ":""}${x.name||""} — ${x.qty||0} ${x.unit||""}`);
   return `<div class="title">${title}</div>
-    <div class="meta">${localDateTime(s.createdAt)} · ${escapeHtml(s.networkType)} · ${escapeHtml(s.cable||"Sem condutor")} · Executado: ${s.lengthExecuted||0} m · ${escapeHtml(s.service||"")}</div>`;
+    <div class="meta">${localDateTime(s.createdAt)} · ${escapeHtml(s.networkType||"—")} · ${escapeHtml(s.cable||"Sem condutor")} · Executado: ${s.lengthExecuted||0} m</div>
+    <div style="margin-top:8px"><b>Serviços:</b> ${srvs.length?`<ul>${srvs.map(x=>`<li>${escapeHtml(x)}</li>`).join("")}</ul>`:'<span class="muted"> Nenhum.</span>'}</div>
+    <div><b>Materiais:</b> ${mats.length?`<ul>${mats.map(x=>`<li>${escapeHtml(x)}</li>`).join("")}</ul>`:'<span class="muted"> Nenhum.</span>'}</div>`;
 }
 function renderSummaryTimeline(){
   summaryTimeline.innerHTML="";
@@ -1448,6 +1475,7 @@ async function clearWork(){
   renderPointsList();
   renderPointSelects();
   renderSegments();
+  renderSegmentServices();renderSegmentMaterials();renderSegmentEditors();
   renderSummary();
   newPoint(false);
   switchPanel("headerPanel");
